@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Field</title>
+<style>
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+  }
+  canvas {
+    display: block;
+  }
+</style>
+</head>
+<body>
+<canvas id="field"></canvas>
+<script>
+  const canvas = document.getElementById('field');
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // Field geometry, in world units (not screen pixels).
+  const WORLD_W = 1920;
+  const WORLD_H = 680;
+  const END_ZONE_W = 160;
+  const PLAY_W = WORLD_W - END_ZONE_W * 2;
+
+  // Maps 0..100 yards, measured from the left goal line, to a world x.
+  function ydx(yards) {
+    return END_ZONE_W + (yards / 100) * PLAY_W;
+  }
+
+  const COLOR_BG = '#14161d';
+  const COLOR_STRIPE_A = '#5aa96a';
+  const COLOR_STRIPE_B = '#4c9a5d';
+  const COLOR_ENDZONE = '#cf3b3b';
+  const COLOR_LINE = '#e8e4d2';
+  const COLOR_WHITE = '#ffffff';
+
+  const YARD_NUMBERS = [10, 20, 30, 40, 50, 40, 30, 20, 10];
+
+  function drawField() {
+    // Mowing stripes.
+    const stripeCount = 22;
+    const stripeW = WORLD_W / stripeCount;
+    for (let i = 0; i < stripeCount; i++) {
+      ctx.fillStyle = i % 2 === 0 ? COLOR_STRIPE_A : COLOR_STRIPE_B;
+      ctx.fillRect(i * stripeW, 0, stripeW, WORLD_H);
+    }
+
+    // End zones.
+    ctx.fillStyle = COLOR_ENDZONE;
+    ctx.fillRect(0, 0, END_ZONE_W, WORLD_H);
+    ctx.fillRect(WORLD_W - END_ZONE_W, 0, END_ZONE_W, WORLD_H);
+
+    // Sideline border.
+    ctx.strokeStyle = COLOR_WHITE;
+    ctx.lineWidth = 4;
+    ctx.strokeRect(2, 2, WORLD_W - 4, WORLD_H - 4);
+
+    // Goal lines.
+    ctx.beginPath();
+    ctx.moveTo(ydx(0), 0);
+    ctx.lineTo(ydx(0), WORLD_H);
+    ctx.moveTo(ydx(100), 0);
+    ctx.lineTo(ydx(100), WORLD_H);
+    ctx.stroke();
+
+    // Yard lines every 5 yards.
+    ctx.strokeStyle = COLOR_LINE;
+    ctx.lineWidth = 2;
+    for (let yards = 5; yards < 100; yards += 5) {
+      const x = ydx(yards);
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, WORLD_H);
+      ctx.stroke();
+    }
+
+    // Yard numbers, near the top and bottom.
+    ctx.fillStyle = COLOR_WHITE;
+    ctx.font = 'bold 40px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    YARD_NUMBERS.forEach((num, i) => {
+      const x = ydx((i + 1) * 10);
+      ctx.fillText(String(num), x, 60);
+      ctx.fillText(String(num), x, WORLD_H - 60);
+    });
+
+    // Hash marks: short ticks every yard at ~34% and ~66% down the field.
+    ctx.strokeStyle = COLOR_LINE;
+    ctx.lineWidth = 2;
+    const hashY1 = WORLD_H * 0.34;
+    const hashY2 = WORLD_H * 0.66;
+    const hashLen = 10;
+    for (let yards = 0; yards <= 100; yards++) {
+      const x = ydx(yards);
+      ctx.beginPath();
+      ctx.moveTo(x, hashY1 - hashLen / 2);
+      ctx.lineTo(x, hashY1 + hashLen / 2);
+      ctx.moveTo(x, hashY2 - hashLen / 2);
+      ctx.lineTo(x, hashY2 + hashLen / 2);
+      ctx.stroke();
+    }
+  }
+
+  function update(dt) {
+  }
+
+  function render(dt) {
+    ctx.fillStyle = COLOR_BG;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    drawField();
+  }
+
+  let lastTime = performance.now();
+  function loop(now) {
+    const dt = Math.min((now - lastTime) / 1000, 0.05);
+    lastTime = now;
+    update(dt);
+    render(dt);
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+</script>
+</body>
+</html>
