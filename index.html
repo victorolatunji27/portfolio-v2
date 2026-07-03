@@ -11,6 +11,7 @@
   }
   canvas {
     display: block;
+    image-rendering: pixelated;
   }
 </style>
 </head>
@@ -20,9 +21,19 @@
   const canvas = document.getElementById('field');
   const ctx = canvas.getContext('2d');
 
+  // Low-resolution offscreen buffer for a pixel-art look.
+  const PXS = 3;
+  let buf, bctx;
+
   function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
+
+    buf = document.createElement('canvas');
+    buf.width = Math.ceil(window.innerWidth / PXS);
+    buf.height = Math.ceil(window.innerHeight / PXS);
+    bctx = buf.getContext('2d');
+    bctx.imageSmoothingEnabled = false;
   }
   window.addEventListener('resize', resize);
   resize();
@@ -52,64 +63,64 @@
     const stripeCount = 22;
     const stripeW = WORLD_W / stripeCount;
     for (let i = 0; i < stripeCount; i++) {
-      ctx.fillStyle = i % 2 === 0 ? COLOR_STRIPE_A : COLOR_STRIPE_B;
-      ctx.fillRect(i * stripeW, 0, stripeW, WORLD_H);
+      bctx.fillStyle = i % 2 === 0 ? COLOR_STRIPE_A : COLOR_STRIPE_B;
+      bctx.fillRect(i * stripeW, 0, stripeW, WORLD_H);
     }
 
     // End zones.
-    ctx.fillStyle = COLOR_ENDZONE;
-    ctx.fillRect(0, 0, END_ZONE_W, WORLD_H);
-    ctx.fillRect(WORLD_W - END_ZONE_W, 0, END_ZONE_W, WORLD_H);
+    bctx.fillStyle = COLOR_ENDZONE;
+    bctx.fillRect(0, 0, END_ZONE_W, WORLD_H);
+    bctx.fillRect(WORLD_W - END_ZONE_W, 0, END_ZONE_W, WORLD_H);
 
     // Sideline border.
-    ctx.strokeStyle = COLOR_WHITE;
-    ctx.lineWidth = 4;
-    ctx.strokeRect(2, 2, WORLD_W - 4, WORLD_H - 4);
+    bctx.strokeStyle = COLOR_WHITE;
+    bctx.lineWidth = 4;
+    bctx.strokeRect(2, 2, WORLD_W - 4, WORLD_H - 4);
 
     // Goal lines.
-    ctx.beginPath();
-    ctx.moveTo(ydx(0), 0);
-    ctx.lineTo(ydx(0), WORLD_H);
-    ctx.moveTo(ydx(100), 0);
-    ctx.lineTo(ydx(100), WORLD_H);
-    ctx.stroke();
+    bctx.beginPath();
+    bctx.moveTo(ydx(0), 0);
+    bctx.lineTo(ydx(0), WORLD_H);
+    bctx.moveTo(ydx(100), 0);
+    bctx.lineTo(ydx(100), WORLD_H);
+    bctx.stroke();
 
     // Yard lines every 5 yards.
-    ctx.strokeStyle = COLOR_LINE;
-    ctx.lineWidth = 2;
+    bctx.strokeStyle = COLOR_LINE;
+    bctx.lineWidth = 2;
     for (let yards = 5; yards < 100; yards += 5) {
       const x = ydx(yards);
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, WORLD_H);
-      ctx.stroke();
+      bctx.beginPath();
+      bctx.moveTo(x, 0);
+      bctx.lineTo(x, WORLD_H);
+      bctx.stroke();
     }
 
     // Yard numbers, near the top and bottom.
-    ctx.fillStyle = COLOR_WHITE;
-    ctx.font = 'bold 40px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    bctx.fillStyle = COLOR_WHITE;
+    bctx.font = 'bold 40px sans-serif';
+    bctx.textAlign = 'center';
+    bctx.textBaseline = 'middle';
     YARD_NUMBERS.forEach((num, i) => {
       const x = ydx((i + 1) * 10);
-      ctx.fillText(String(num), x, 60);
-      ctx.fillText(String(num), x, WORLD_H - 60);
+      bctx.fillText(String(num), x, 60);
+      bctx.fillText(String(num), x, WORLD_H - 60);
     });
 
     // Hash marks: short ticks every yard at ~34% and ~66% down the field.
-    ctx.strokeStyle = COLOR_LINE;
-    ctx.lineWidth = 2;
+    bctx.strokeStyle = COLOR_LINE;
+    bctx.lineWidth = 2;
     const hashY1 = WORLD_H * 0.34;
     const hashY2 = WORLD_H * 0.66;
     const hashLen = 10;
     for (let yards = 0; yards <= 100; yards++) {
       const x = ydx(yards);
-      ctx.beginPath();
-      ctx.moveTo(x, hashY1 - hashLen / 2);
-      ctx.lineTo(x, hashY1 + hashLen / 2);
-      ctx.moveTo(x, hashY2 - hashLen / 2);
-      ctx.lineTo(x, hashY2 + hashLen / 2);
-      ctx.stroke();
+      bctx.beginPath();
+      bctx.moveTo(x, hashY1 - hashLen / 2);
+      bctx.lineTo(x, hashY1 + hashLen / 2);
+      bctx.moveTo(x, hashY2 - hashLen / 2);
+      bctx.lineTo(x, hashY2 + hashLen / 2);
+      bctx.stroke();
     }
   }
 
@@ -117,9 +128,12 @@
   }
 
   function render(dt) {
-    ctx.fillStyle = COLOR_BG;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    bctx.fillStyle = COLOR_BG;
+    bctx.fillRect(0, 0, buf.width, buf.height);
     drawField();
+
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(buf, 0, 0, buf.width * PXS, buf.height * PXS);
   }
 
   let lastTime = performance.now();
