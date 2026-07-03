@@ -63,7 +63,13 @@
   const COLOR_LINE = '#e8e4d2';
   const COLOR_WHITE = '#ffffff';
   const COLOR_STAND = '#23262f';
-  const COLOR_PLAYER = '#f2c744';
+
+  const COLOR_HELMET = '#cf3b3b';
+  const COLOR_HELMET_STRIPE = '#e8e4d2';
+  const COLOR_SKIN = '#8a5a3b';
+  const COLOR_FACEMASK = '#8a8a8a';
+  const COLOR_JERSEY = '#1a1714';
+  const COLOR_BALL = '#5c3b22';
 
   const CROWD_PALETTE = ['#cf3b3b', '#e8e4d2', '#d4af37', '#3b5fcf', '#8a2f2f', '#2f4f8a'];
 
@@ -214,14 +220,17 @@
   }
 
   // Player.
-  const PLAYER_W = 20;
+  const PLAYER_W = 24;
   const PLAYER_H = 32;
+  const WALK_RATE = 6;
 
   const P = {
     x: FIELD_X + FIELD_W / 2,
     y: FIELD_Y + FIELD_H / 2,
     speed: 320,
     face: 1,
+    moving: false,
+    animTime: 0,
   };
 
   // Camera: world-space top-left corner of the visible viewport.
@@ -252,8 +261,78 @@
   });
 
   function drawPlayer() {
-    bctx.fillStyle = COLOR_PLAYER;
-    bctx.fillRect(P.x - PLAYER_W / 2, P.y - PLAYER_H / 2, PLAYER_W, PLAYER_H);
+    const top = P.y - PLAYER_H / 2;
+
+    const helmetH = 8;
+    const jerseyH = 12;
+    const legsH = PLAYER_H - helmetH - jerseyH;
+    const helmetTop = top;
+    const jerseyTop = top + helmetH;
+    const legsTop = top + helmetH + jerseyH;
+
+    // Soft shadow under the sprite.
+    bctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    bctx.fillRect(P.x - 9, top + PLAYER_H, 18, 4);
+
+    // Legs: two-frame walk animation, still when not moving.
+    const legW = 6;
+    const legGap = 2;
+    const legsLeft = P.x - (legW * 2 + legGap) / 2;
+    let leadLift = 0;
+    let trailLift = 0;
+    if (P.moving) {
+      const phase = Math.floor(P.animTime * WALK_RATE) % 2;
+      leadLift = phase === 0 ? 3 : 0;
+      trailLift = phase === 0 ? 0 : 3;
+    }
+    bctx.fillStyle = COLOR_WHITE;
+    bctx.fillRect(legsLeft, legsTop + leadLift, legW, legsH - leadLift);
+    bctx.fillRect(legsLeft + legW + legGap, legsTop + trailLift, legW, legsH - trailLift);
+
+    // Arms (brown).
+    const armW = 4;
+    const jerseyW = 14;
+    const jerseyLeft = P.x - jerseyW / 2;
+    bctx.fillStyle = COLOR_SKIN;
+    bctx.fillRect(jerseyLeft - armW, jerseyTop + 2, armW, jerseyH - 4);
+    bctx.fillRect(jerseyLeft + jerseyW, jerseyTop + 2, armW, jerseyH - 4);
+
+    // Jersey (black) with number.
+    bctx.fillStyle = COLOR_JERSEY;
+    bctx.fillRect(jerseyLeft, jerseyTop, jerseyW, jerseyH);
+    bctx.fillStyle = COLOR_WHITE;
+    bctx.font = 'bold 6px sans-serif';
+    bctx.textAlign = 'center';
+    bctx.textBaseline = 'middle';
+    bctx.fillText('29', P.x, jerseyTop + jerseyH / 2 + 1);
+
+    // Football tucked under the front arm, on the facing side.
+    const ballSize = 4;
+    const ballY = jerseyTop + jerseyH - ballSize - 1;
+    const ballX = P.face === 1
+      ? jerseyLeft + jerseyW - 2
+      : jerseyLeft - ballSize + 2;
+    bctx.fillStyle = COLOR_BALL;
+    bctx.fillRect(ballX, ballY, ballSize, ballSize);
+
+    // Helmet (red) with cream stripe and brown face.
+    const helmetW = 12;
+    const helmetLeft = P.x - helmetW / 2;
+    bctx.fillStyle = COLOR_HELMET;
+    bctx.fillRect(helmetLeft, helmetTop, helmetW, helmetH);
+    bctx.fillStyle = COLOR_HELMET_STRIPE;
+    bctx.fillRect(helmetLeft, helmetTop + helmetH / 2 - 1, helmetW, 2);
+
+    const faceW = 5;
+    const faceX = P.face === 1 ? helmetLeft + helmetW - faceW : helmetLeft;
+    bctx.fillStyle = COLOR_SKIN;
+    bctx.fillRect(faceX, helmetTop + 2, faceW, helmetH - 3);
+
+    // Facemask (gray), on the facing side.
+    const maskW = 2;
+    const maskX = P.face === 1 ? helmetLeft + helmetW : helmetLeft - maskW;
+    bctx.fillStyle = COLOR_FACEMASK;
+    bctx.fillRect(maskX, helmetTop + 3, maskW, helmetH - 4);
   }
 
   function update(dt) {
@@ -275,6 +354,9 @@
 
     if (dx > 0) P.face = 1;
     else if (dx < 0) P.face = -1;
+
+    P.moving = dx !== 0 || dy !== 0;
+    P.animTime = P.moving ? P.animTime + dt : 0;
 
     P.x = clamp(P.x, FIELD_X + PLAYER_W / 2, FIELD_X + FIELD_W - PLAYER_W / 2);
     P.y = clamp(P.y, FIELD_Y + PLAYER_H / 2, FIELD_Y + FIELD_H - PLAYER_H / 2);
