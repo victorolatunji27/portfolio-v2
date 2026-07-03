@@ -58,6 +58,45 @@
 
   const YARD_NUMBERS = [10, 20, 30, 40, 50, 40, 30, 20, 10];
 
+  // Player.
+  const PLAYER_W = 20;
+  const PLAYER_H = 32;
+  const COLOR_PLAYER = '#f2c744';
+
+  const P = {
+    x: WORLD_W / 2,
+    y: WORLD_H / 2,
+    speed: 320,
+    face: 1,
+  };
+
+  // Camera: world-space top-left corner of the visible viewport.
+  const CAM_EASE_RATE = 6;
+  const cam = { x: 0, y: 0 };
+
+  function clamp(v, lo, hi) {
+    return Math.min(Math.max(v, lo), hi);
+  }
+
+  // Held-key tracking for WASD and arrow keys.
+  const keys = {};
+  const TRACKED_KEYS = new Set([
+    'KeyW', 'KeyA', 'KeyS', 'KeyD',
+    'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+  ]);
+  window.addEventListener('keydown', (e) => {
+    if (TRACKED_KEYS.has(e.code)) {
+      keys[e.code] = true;
+      e.preventDefault();
+    }
+  });
+  window.addEventListener('keyup', (e) => {
+    if (TRACKED_KEYS.has(e.code)) {
+      keys[e.code] = false;
+      e.preventDefault();
+    }
+  });
+
   function drawField() {
     // Mowing stripes.
     const stripeCount = 22;
@@ -124,13 +163,59 @@
     }
   }
 
+  function drawPlayer() {
+    bctx.fillStyle = COLOR_PLAYER;
+    bctx.fillRect(P.x - PLAYER_W / 2, P.y - PLAYER_H / 2, PLAYER_W, PLAYER_H);
+  }
+
   function update(dt) {
+    let dx = 0;
+    let dy = 0;
+    if (keys.KeyA || keys.ArrowLeft) dx -= 1;
+    if (keys.KeyD || keys.ArrowRight) dx += 1;
+    if (keys.KeyW || keys.ArrowUp) dy -= 1;
+    if (keys.KeyS || keys.ArrowDown) dy += 1;
+
+    if (dx !== 0 || dy !== 0) {
+      const len = Math.hypot(dx, dy);
+      dx /= len;
+      dy /= len;
+    }
+
+    P.x += dx * P.speed * dt;
+    P.y += dy * P.speed * dt;
+
+    if (dx > 0) P.face = 1;
+    else if (dx < 0) P.face = -1;
+
+    P.x = clamp(P.x, PLAYER_W / 2, WORLD_W - PLAYER_W / 2);
+    P.y = clamp(P.y, PLAYER_H / 2, WORLD_H - PLAYER_H / 2);
+
+    // Ease the camera toward centering on the player.
+    const targetX = P.x - buf.width / 2;
+    const targetY = P.y - buf.height / 2;
+    const ease = 1 - Math.exp(-CAM_EASE_RATE * dt);
+    cam.x += (targetX - cam.x) * ease;
+    cam.y += (targetY - cam.y) * ease;
+
+    // Clamp so the camera never shows past the world edges.
+    cam.x = buf.width >= WORLD_W
+      ? (WORLD_W - buf.width) / 2
+      : clamp(cam.x, 0, WORLD_W - buf.width);
+    cam.y = buf.height >= WORLD_H
+      ? (WORLD_H - buf.height) / 2
+      : clamp(cam.y, 0, WORLD_H - buf.height);
   }
 
   function render(dt) {
     bctx.fillStyle = COLOR_BG;
     bctx.fillRect(0, 0, buf.width, buf.height);
+
+    bctx.save();
+    bctx.translate(-cam.x, -cam.y);
     drawField();
+    drawPlayer();
+    bctx.restore();
 
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(buf, 0, 0, buf.width * PXS, buf.height * PXS);
