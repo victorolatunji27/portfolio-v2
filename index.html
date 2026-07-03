@@ -94,11 +94,31 @@
     color: #e8e4d2;
     text-decoration: underline;
   }
+
+  #soundToggle {
+    position: fixed;
+    top: 54px;
+    left: 12px;
+    padding: 6px 14px;
+    background: rgba(20, 22, 29, 0.75);
+    color: #e8e4d2;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    border: 1px solid #3a3d47;
+    border-radius: 4px;
+    cursor: pointer;
+    z-index: 10;
+  }
+  #soundToggle:hover {
+    background: rgba(35, 38, 47, 0.9);
+  }
 </style>
 </head>
 <body>
 <canvas id="field"></canvas>
 <div id="scoreboard">&mdash;</div>
+<button id="soundToggle" type="button">SOUND: ON</button>
 <aside id="drawer">
   <div class="drawer-yard" id="drawerYard"></div>
   <h2 id="drawerTitle"></h2>
@@ -158,6 +178,16 @@
   const COLOR_FACEMASK = '#8a8a8a';
   const COLOR_JERSEY = '#1a1714';
   const COLOR_BALL = '#5c3b22';
+  const COLOR_NAVY = '#1c2b4a';
+
+  const PLAYER_COLORS = {
+    helmet: COLOR_HELMET, stripe: COLOR_HELMET_STRIPE, skin: COLOR_SKIN,
+    mask: COLOR_FACEMASK, jersey: COLOR_JERSEY, pants: COLOR_WHITE,
+  };
+  const DEFENDER_COLORS = {
+    helmet: COLOR_NAVY, stripe: COLOR_WHITE, skin: COLOR_SKIN,
+    mask: COLOR_FACEMASK, jersey: COLOR_WHITE, pants: COLOR_LINE,
+  };
 
   const CROWD_PALETTE = ['#cf3b3b', '#e8e4d2', '#d4af37', '#3b5fcf', '#8a2f2f', '#2f4f8a'];
 
@@ -261,23 +291,11 @@
     },
   ];
 
-  function drawMarkers(c) {
-    Z.forEach((entry) => {
-      c.fillStyle = CATEGORY_COLORS[entry.category] || COLOR_WHITE;
-      c.beginPath();
-      c.arc(entry.x, entry.y, 6, 0, Math.PI * 2);
-      c.fill();
-      c.strokeStyle = COLOR_WHITE;
-      c.lineWidth = 1;
-      c.stroke();
-
-      c.fillStyle = COLOR_WHITE;
-      c.font = 'bold 10px sans-serif';
-      c.textAlign = 'center';
-      c.textBaseline = 'top';
-      c.fillText(entry.plate, entry.x, entry.y + 10);
-    });
-  }
+  // Knockdown state for each defender: ramps 0..1 while active, decays otherwise.
+  Z.forEach((entry) => {
+    entry.knock = 0;
+    entry._knockedDown = false;
+  });
 
   function drawField(c) {
     // Mowing stripes.
@@ -408,9 +426,6 @@
 
     // Banners on the inner railings.
     drawBanners();
-
-    // Content stop markers.
-    drawMarkers(worldCtx);
   }
 
   function resize() {
@@ -467,6 +482,55 @@
     }
   });
 
+  // Web Audio chiptune: square-wave blips, a low thud, and a jingle.
+  let audioCtx = null;
+  let soundEnabled = true;
+
+  function unlockAudio() {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    } else if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+    window.removeEventListener('click', unlockAudio);
+    window.removeEventListener('keydown', unlockAudio);
+  }
+  window.addEventListener('click', unlockAudio);
+  window.addEventListener('keydown', unlockAudio);
+
+  function playTone(freq, duration, type, peakGain, delay) {
+    if (!soundEnabled || !audioCtx) return;
+    const t0 = audioCtx.currentTime + (delay || 0);
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t0);
+    gain.gain.setValueAtTime(peakGain, t0);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t0);
+    osc.stop(t0 + duration + 0.02);
+  }
+
+  function playBlip() {
+    playTone(880, 0.08, 'square', 0.15);
+  }
+
+  function playThud() {
+    playTone(90, 0.18, 'sine', 0.3);
+  }
+
+  function playJingle() {
+    const notes = [523.25, 659.25, 784.0, 1046.5, 1318.5];
+    notes.forEach((freq, i) => playTone(freq, 0.12, 'square', 0.12, i * 0.09));
+  }
+
+  const soundToggleEl = document.getElementById('soundToggle');
+  soundToggleEl.addEventListener('click', () => {
+    soundEnabled = !soundEnabled;
+    soundToggleEl.textContent = 'SOUND: ' + (soundEnabled ? 'ON' : 'OFF');
+  });
+
   // Proximity detection and the DOM drawer/scoreboard it drives.
   const PROXIMITY_RADIUS = 94;
   let activeId = null;
@@ -513,10 +577,17 @@
     drawerBodyEl.innerHTML = renderBody(entry.body);
     drawerEl.classList.add('open');
     scoreboardEl.textContent = entry.plate + ' — ' + entry.title;
+
+    playBlip();
+    if (entry.category === 'project' || entry.category === 'contact') {
+      playJingle();
+    }
   }
 
-  function drawPlayer() {
-    const top = P.y - PLAYER_H / 2;
+  // Draws one sprite centered on the current bctx origin (0, 0): a helmet,
+  // jersey, arms, and legs built from filled rectangles.
+  function drawCharacterBody(face, moving, animTime, colors, opts) {
+    const top = -PLAYER_H / 2;
 
     const helmetH = 8;
     const jerseyH = 12;
@@ -527,67 +598,161 @@
 
     // Soft shadow under the sprite.
     bctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
-    bctx.fillRect(P.x - 9, top + PLAYER_H, 18, 4);
+    bctx.fillRect(-9, top + PLAYER_H, 18, 4);
 
     // Legs: two-frame walk animation, still when not moving.
     const legW = 6;
     const legGap = 2;
-    const legsLeft = P.x - (legW * 2 + legGap) / 2;
+    const legsLeft = -(legW * 2 + legGap) / 2;
     let leadLift = 0;
     let trailLift = 0;
-    if (P.moving) {
-      const phase = Math.floor(P.animTime * WALK_RATE) % 2;
+    if (moving) {
+      const phase = Math.floor(animTime * WALK_RATE) % 2;
       leadLift = phase === 0 ? 3 : 0;
       trailLift = phase === 0 ? 0 : 3;
     }
-    bctx.fillStyle = COLOR_WHITE;
+    bctx.fillStyle = colors.pants;
     bctx.fillRect(legsLeft, legsTop + leadLift, legW, legsH - leadLift);
     bctx.fillRect(legsLeft + legW + legGap, legsTop + trailLift, legW, legsH - trailLift);
 
-    // Arms (brown).
+    // Arms.
     const armW = 4;
     const jerseyW = 14;
-    const jerseyLeft = P.x - jerseyW / 2;
-    bctx.fillStyle = COLOR_SKIN;
+    const jerseyLeft = -jerseyW / 2;
+    bctx.fillStyle = colors.skin;
     bctx.fillRect(jerseyLeft - armW, jerseyTop + 2, armW, jerseyH - 4);
     bctx.fillRect(jerseyLeft + jerseyW, jerseyTop + 2, armW, jerseyH - 4);
 
-    // Jersey (black) with number.
-    bctx.fillStyle = COLOR_JERSEY;
+    // Jersey, with an optional number.
+    bctx.fillStyle = colors.jersey;
     bctx.fillRect(jerseyLeft, jerseyTop, jerseyW, jerseyH);
-    bctx.fillStyle = COLOR_WHITE;
-    bctx.font = 'bold 6px sans-serif';
-    bctx.textAlign = 'center';
-    bctx.textBaseline = 'middle';
-    bctx.fillText('29', P.x, jerseyTop + jerseyH / 2 + 1);
+    if (opts.number) {
+      bctx.fillStyle = colors.jerseyText || COLOR_WHITE;
+      bctx.font = 'bold 6px sans-serif';
+      bctx.textAlign = 'center';
+      bctx.textBaseline = 'middle';
+      bctx.fillText(opts.number, 0, jerseyTop + jerseyH / 2 + 1);
+    }
 
     // Football tucked under the front arm, on the facing side.
-    const ballSize = 4;
-    const ballY = jerseyTop + jerseyH - ballSize - 1;
-    const ballX = P.face === 1
-      ? jerseyLeft + jerseyW - 2
-      : jerseyLeft - ballSize + 2;
-    bctx.fillStyle = COLOR_BALL;
-    bctx.fillRect(ballX, ballY, ballSize, ballSize);
+    if (opts.ball) {
+      const ballSize = 4;
+      const ballY = jerseyTop + jerseyH - ballSize - 1;
+      const ballX = face === 1 ? jerseyLeft + jerseyW - 2 : jerseyLeft - ballSize + 2;
+      bctx.fillStyle = COLOR_BALL;
+      bctx.fillRect(ballX, ballY, ballSize, ballSize);
+    }
 
-    // Helmet (red) with cream stripe and brown face.
+    // Helmet with a stripe and face.
     const helmetW = 12;
-    const helmetLeft = P.x - helmetW / 2;
-    bctx.fillStyle = COLOR_HELMET;
+    const helmetLeft = -helmetW / 2;
+    bctx.fillStyle = colors.helmet;
     bctx.fillRect(helmetLeft, helmetTop, helmetW, helmetH);
-    bctx.fillStyle = COLOR_HELMET_STRIPE;
+    bctx.fillStyle = colors.stripe;
     bctx.fillRect(helmetLeft, helmetTop + helmetH / 2 - 1, helmetW, 2);
 
     const faceW = 5;
-    const faceX = P.face === 1 ? helmetLeft + helmetW - faceW : helmetLeft;
-    bctx.fillStyle = COLOR_SKIN;
+    const faceX = face === 1 ? helmetLeft + helmetW - faceW : helmetLeft;
+    bctx.fillStyle = colors.skin;
     bctx.fillRect(faceX, helmetTop + 2, faceW, helmetH - 3);
 
-    // Facemask (gray), on the facing side.
+    // Facemask, on the facing side.
     const maskW = 2;
-    const maskX = P.face === 1 ? helmetLeft + helmetW : helmetLeft - maskW;
-    bctx.fillStyle = COLOR_FACEMASK;
+    const maskX = face === 1 ? helmetLeft + helmetW : helmetLeft - maskW;
+    bctx.fillStyle = colors.mask;
     bctx.fillRect(maskX, helmetTop + 3, maskW, helmetH - 4);
+  }
+
+  function drawPlayer() {
+    bctx.save();
+    bctx.translate(P.x, P.y);
+    drawCharacterBody(P.face, P.moving, P.animTime, PLAYER_COLORS, { ball: true, number: '29' });
+    bctx.restore();
+  }
+
+  // Knockdown tuning: how fast knock ramps up/decays, how far a defender is
+  // pushed away, how high it hops, and how far it rotates as knock goes 0..1.
+  const KNOCK_RAMP_RATE = 1 / 0.5;
+  const KNOCK_DECAY_RATE = 1 / 0.9;
+  const KNOCK_PUSH_DIST = 14;
+  const KNOCK_HOP_HEIGHT = 10;
+  const KNOCK_ROTATION = 1.3;
+  const POW_MIN = 0.2;
+  const POW_MAX = 0.85;
+
+  function drawDefender(entry) {
+    const knock = entry.knock;
+    const awayX = entry.x - P.x;
+    const awayY = entry.y - P.y;
+    const awayLen = Math.hypot(awayX, awayY) || 1;
+    const pushDist = knock * KNOCK_PUSH_DIST;
+    const px = entry.x + (awayX / awayLen) * pushDist;
+    const py = entry.y + (awayY / awayLen) * pushDist;
+    const hop = Math.sin(knock * Math.PI) * KNOCK_HOP_HEIGHT;
+    const face = P.x >= entry.x ? 1 : -1;
+    const rotation = -face * knock * KNOCK_ROTATION;
+
+    bctx.save();
+    bctx.translate(px, py - hop);
+    bctx.rotate(rotation);
+    drawCharacterBody(face, false, 0, DEFENDER_COLORS, {});
+    bctx.restore();
+  }
+
+  // Crisp name-plate overlay, drawn on the main (full-resolution) canvas —
+  // not the low-res pixel buffer — so the text stays sharp.
+  const PLATE_FONT = "bold 13px 'Courier New', monospace";
+
+  function worldToScreen(x, y) {
+    return { x: (x - cam.x) * PXS, y: (y - cam.y) * PXS };
+  }
+
+  function drawPlate(entry) {
+    const isActive = entry.id === activeId;
+    const pos = worldToScreen(entry.x, entry.y - (PLAYER_H / 2 + 14));
+    if (pos.x < -100 || pos.x > canvas.width + 100 || pos.y < -40 || pos.y > canvas.height + 40) return;
+
+    const label = entry.yard === 'EZ' ? entry.plate : entry.plate + ' ' + entry.yard;
+    ctx.font = PLATE_FONT;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const textW = ctx.measureText(label).width;
+    const boxW = textW + 16;
+    const boxH = 18;
+    const sx = Math.round(pos.x);
+    const sy = Math.round(pos.y);
+
+    ctx.fillStyle = isActive ? 'rgba(20, 22, 29, 0.85)' : 'rgba(20, 22, 29, 0.55)';
+    ctx.fillRect(sx - boxW / 2, sy - boxH / 2, boxW, boxH);
+    ctx.strokeStyle = isActive ? (CATEGORY_COLORS[entry.category] || '#f2c744') : 'rgba(201, 197, 186, 0.4)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(sx - boxW / 2 + 0.5, sy - boxH / 2 + 0.5, boxW - 1, boxH - 1);
+
+    ctx.fillStyle = isActive ? '#ffffff' : 'rgba(232, 228, 210, 0.7)';
+    ctx.fillText(label, sx, sy + 1);
+  }
+
+  function drawPow(entry) {
+    if (entry.knock <= POW_MIN || entry.knock >= POW_MAX) return;
+    const pos = worldToScreen(entry.x, entry.y - (PLAYER_H / 2 + 34));
+
+    ctx.save();
+    ctx.translate(Math.round(pos.x), Math.round(pos.y));
+    ctx.rotate(-0.15);
+    ctx.font = "bold 20px 'Courier New', monospace";
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.strokeStyle = '#1a1714';
+    ctx.lineWidth = 3;
+    ctx.strokeText('POW!', 0, 0);
+    ctx.fillStyle = '#f2c744';
+    ctx.fillText('POW!', 0, 0);
+    ctx.restore();
+  }
+
+  function drawOverlay() {
+    Z.forEach(drawPlate);
+    Z.forEach(drawPow);
   }
 
   function update(dt) {
@@ -638,6 +803,24 @@
       activeId = nearestId;
       setActiveEntry(nearest);
     }
+
+    // Knockdown: ramp the active defender's knock toward 1, decay the rest.
+    Z.forEach((entry) => {
+      const target = entry.id === activeId ? 1 : 0;
+      const rate = target === 1 ? KNOCK_RAMP_RATE : KNOCK_DECAY_RATE;
+      if (entry.knock < target) {
+        entry.knock = Math.min(target, entry.knock + rate * dt);
+      } else if (entry.knock > target) {
+        entry.knock = Math.max(target, entry.knock - rate * dt);
+      }
+
+      if (entry.knock >= 0.999 && !entry._knockedDown) {
+        entry._knockedDown = true;
+        playThud();
+      } else if (entry.knock < 0.05) {
+        entry._knockedDown = false;
+      }
+    });
   }
 
   function render(dt) {
@@ -647,11 +830,14 @@
     bctx.save();
     bctx.translate(-cam.x, -cam.y);
     bctx.drawImage(world, 0, 0);
+    Z.forEach(drawDefender);
     drawPlayer();
     bctx.restore();
 
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(buf, 0, 0, buf.width * PXS, buf.height * PXS);
+
+    drawOverlay();
   }
 
   window.addEventListener('resize', resize);
