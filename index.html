@@ -13,10 +13,98 @@
     display: block;
     image-rendering: pixelated;
   }
+
+  #scoreboard {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    padding: 8px 14px;
+    background: rgba(20, 22, 29, 0.75);
+    color: #e8e4d2;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    letter-spacing: 0.05em;
+    border: 1px solid #3a3d47;
+    border-radius: 4px;
+    z-index: 10;
+  }
+
+  #drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 320px;
+    max-width: 85vw;
+    height: 100%;
+    box-sizing: border-box;
+    padding: 28px 24px;
+    background: rgba(18, 20, 26, 0.94);
+    color: #e8e4d2;
+    font-family: system-ui, sans-serif;
+    border-left: 1px solid #3a3d47;
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+    overflow-y: auto;
+    z-index: 10;
+  }
+  #drawer.open {
+    transform: translateX(0);
+  }
+  #drawer .drawer-yard {
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    color: #d4af37;
+    margin-bottom: 6px;
+  }
+  #drawer h2 {
+    margin: 0 0 4px;
+    font-size: 22px;
+  }
+  #drawer .drawer-meta {
+    font-size: 13px;
+    color: #a9a49a;
+    margin-bottom: 16px;
+  }
+  #drawer .drawer-body {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  #drawer .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  #drawer .tag {
+    padding: 4px 10px;
+    background: #23262f;
+    border: 1px solid #3a3d47;
+    border-radius: 999px;
+    font-size: 12px;
+  }
+  #drawer .links {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  #drawer .links li + li {
+    margin-top: 8px;
+  }
+  #drawer .links a {
+    color: #e8e4d2;
+    text-decoration: underline;
+  }
 </style>
 </head>
 <body>
 <canvas id="field"></canvas>
+<div id="scoreboard">&mdash;</div>
+<aside id="drawer">
+  <div class="drawer-yard" id="drawerYard"></div>
+  <h2 id="drawerTitle"></h2>
+  <div class="drawer-meta" id="drawerMeta"></div>
+  <div class="drawer-body" id="drawerBody"></div>
+</aside>
 <script>
   const canvas = document.getElementById('field');
   const ctx = canvas.getContext('2d');
@@ -74,6 +162,122 @@
   const CROWD_PALETTE = ['#cf3b3b', '#e8e4d2', '#d4af37', '#3b5fcf', '#8a2f2f', '#2f4f8a'];
 
   const YARD_NUMBERS = [10, 20, 30, 40, 50, 40, 30, 20, 10];
+
+  const CATEGORY_COLORS = {
+    about: '#3b5fcf',
+    skills: '#d4af37',
+    experience: '#2f8a5a',
+    project: '#cf3b3b',
+    contact: '#e8e4d2',
+  };
+
+  // Content stops, zigzagging down the field. Placeholder copy — swap in
+  // your own bio, skills, experience, and project details.
+  const Z = [
+    {
+      id: 'about', category: 'about',
+      x: FIELD_X + END_ZONE_W / 2, y: FIELD_Y + FIELD_H / 2,
+      yard: 'EZ', plate: 'ABOUT',
+      title: 'Victor Olatunji',
+      meta: 'Computer Science · University of Maryland',
+      body: { html: '<p>I build small, fast, playful things for the web — this stadium included. I like JavaScript, canvas rendering, and turning plain data into interfaces that feel alive.</p>' },
+    },
+    {
+      id: 'skill-frontend', category: 'skills',
+      x: ydx(10), y: FIELD_Y + FIELD_H * 0.34,
+      yard: '10', plate: 'SKILLS',
+      title: 'Frontend',
+      meta: 'Languages & UI',
+      body: { tags: ['JavaScript', 'HTML/CSS', 'React', 'Canvas API'] },
+    },
+    {
+      id: 'skill-backend', category: 'skills',
+      x: ydx(20), y: FIELD_Y + FIELD_H * 0.66,
+      yard: '20', plate: 'SKILLS',
+      title: 'Backend & Tools',
+      meta: 'Systems & workflow',
+      body: { tags: ['Node.js', 'Python', 'Git', 'SQL'] },
+    },
+    {
+      id: 'exp-umd', category: 'experience',
+      x: ydx(30), y: FIELD_Y + FIELD_H * 0.34,
+      yard: '30', plate: 'EXP',
+      title: 'University of Maryland',
+      meta: 'B.S. Computer Science',
+      body: { html: '<p>Coursework spanning data structures, algorithms, and full-stack web development.</p>' },
+    },
+    {
+      id: 'exp-codepath', category: 'experience',
+      x: ydx(40), y: FIELD_Y + FIELD_H * 0.66,
+      yard: '40', plate: 'EXP',
+      title: 'CodePath TIP102 / WEB102',
+      meta: 'Technical interview prep & full-stack track',
+      body: { html: '<p>Advanced data structures and technical interview practice alongside a full-stack web development track.</p>' },
+    },
+    {
+      id: 'proj-lectureloop', category: 'project',
+      x: ydx(50), y: FIELD_Y + FIELD_H * 0.34,
+      yard: '50', plate: 'PROJ',
+      title: 'LectureLoop',
+      meta: 'Web app',
+      body: { links: [{ label: 'GitHub', href: 'https://github.com/victorolatunji27/lectureloop' }] },
+    },
+    {
+      id: 'proj-echosense', category: 'project',
+      x: ydx(60), y: FIELD_Y + FIELD_H * 0.66,
+      yard: '60', plate: 'PROJ',
+      title: 'EchoSense',
+      meta: 'Web app',
+      body: { links: [{ label: 'GitHub', href: 'https://github.com/victorolatunji27/echosense' }] },
+    },
+    {
+      id: 'proj-volterra', category: 'project',
+      x: ydx(70), y: FIELD_Y + FIELD_H * 0.34,
+      yard: '70', plate: 'PROJ',
+      title: 'Volterra AI',
+      meta: 'Web app',
+      body: { links: [{ label: 'GitHub', href: 'https://github.com/victorolatunji27/volterra-ai' }] },
+    },
+    {
+      id: 'proj-portfolio', category: 'project',
+      x: ydx(80), y: FIELD_Y + FIELD_H * 0.66,
+      yard: '80', plate: 'PROJ',
+      title: 'This Stadium',
+      meta: 'Canvas · vanilla JS',
+      body: { links: [{ label: 'GitHub', href: 'https://github.com/victorolatunji27/portfolio-v2' }] },
+    },
+    {
+      id: 'contact', category: 'contact',
+      x: FIELD_X + FIELD_W - END_ZONE_W / 2, y: FIELD_Y + FIELD_H / 2,
+      yard: 'EZ', plate: 'CONTACT',
+      title: "Let's talk",
+      meta: 'Reach out',
+      body: {
+        links: [
+          { label: 'Email', href: 'mailto:volatunj@terpmail.umd.edu' },
+          { label: 'GitHub', href: 'https://github.com/victorolatunji27' },
+        ],
+      },
+    },
+  ];
+
+  function drawMarkers(c) {
+    Z.forEach((entry) => {
+      c.fillStyle = CATEGORY_COLORS[entry.category] || COLOR_WHITE;
+      c.beginPath();
+      c.arc(entry.x, entry.y, 6, 0, Math.PI * 2);
+      c.fill();
+      c.strokeStyle = COLOR_WHITE;
+      c.lineWidth = 1;
+      c.stroke();
+
+      c.fillStyle = COLOR_WHITE;
+      c.font = 'bold 10px sans-serif';
+      c.textAlign = 'center';
+      c.textBaseline = 'top';
+      c.fillText(entry.plate, entry.x, entry.y + 10);
+    });
+  }
 
   function drawField(c) {
     // Mowing stripes.
@@ -204,6 +408,9 @@
 
     // Banners on the inner railings.
     drawBanners();
+
+    // Content stop markers.
+    drawMarkers(worldCtx);
   }
 
   function resize() {
@@ -259,6 +466,54 @@
       e.preventDefault();
     }
   });
+
+  // Proximity detection and the DOM drawer/scoreboard it drives.
+  const PROXIMITY_RADIUS = 94;
+  let activeId = null;
+
+  const drawerEl = document.getElementById('drawer');
+  const drawerYardEl = document.getElementById('drawerYard');
+  const drawerTitleEl = document.getElementById('drawerTitle');
+  const drawerMetaEl = document.getElementById('drawerMeta');
+  const drawerBodyEl = document.getElementById('drawerBody');
+  const scoreboardEl = document.getElementById('scoreboard');
+
+  function renderBody(body) {
+    if (body.tags) {
+      return '<div class="tags">' + body.tags.map((t) => `<span class="tag">${t}</span>`).join('') + '</div>';
+    }
+    if (body.links) {
+      return '<ul class="links">' + body.links.map((l) => `<li><a href="${l.href}" target="_blank" rel="noopener">${l.label}</a></li>`).join('') + '</ul>';
+    }
+    return body.html || '';
+  }
+
+  function findNearest() {
+    let nearest = null;
+    let nearestDist = Infinity;
+    for (const entry of Z) {
+      const dist = Math.hypot(entry.x - P.x, entry.y - P.y);
+      if (dist < nearestDist) {
+        nearestDist = dist;
+        nearest = entry;
+      }
+    }
+    return nearestDist <= PROXIMITY_RADIUS ? nearest : null;
+  }
+
+  function setActiveEntry(entry) {
+    if (!entry) {
+      drawerEl.classList.remove('open');
+      scoreboardEl.textContent = '—';
+      return;
+    }
+    drawerYardEl.textContent = entry.plate + (entry.yard ? ' · YD ' + entry.yard : '');
+    drawerTitleEl.textContent = entry.title;
+    drawerMetaEl.textContent = entry.meta;
+    drawerBodyEl.innerHTML = renderBody(entry.body);
+    drawerEl.classList.add('open');
+    scoreboardEl.textContent = entry.plate + ' — ' + entry.title;
+  }
 
   function drawPlayer() {
     const top = P.y - PLAYER_H / 2;
@@ -375,6 +630,14 @@
     cam.y = buf.height >= WORLD_H
       ? (WORLD_H - buf.height) / 2
       : clamp(cam.y, 0, WORLD_H - buf.height);
+
+    // Proximity detection: open/update the drawer when the nearest stop changes.
+    const nearest = findNearest();
+    const nearestId = nearest ? nearest.id : null;
+    if (nearestId !== activeId) {
+      activeId = nearestId;
+      setActiveEntry(nearest);
+    }
   }
 
   function render(dt) {
