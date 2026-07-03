@@ -514,6 +514,10 @@
   const CAM_EASE_RATE = 6;
   const cam = { x: 0, y: 0 };
 
+  // Auto-walk target set by clicking the jumbotron; any key press cancels it.
+  const MOVE_ARRIVE_DIST = 6;
+  let moveTarget = null;
+
   function clamp(v, lo, hi) {
     return Math.min(Math.max(v, lo), hi);
   }
@@ -587,8 +591,17 @@
   });
 
   // Proximity detection and the DOM drawer/scoreboard it drives.
+  // `proximityId` is the nearest stop within walking range (drives the
+  // knockdown and arrival sounds). `hoverId` is whatever the mouse is over
+  // (lets a mouse user scout panels without walking). `activeId` is
+  // whichever of the two is currently on screen, hover taking priority.
   const PROXIMITY_RADIUS = 94;
+  const HOVER_RADIUS = 60;
+  let proximityId = null;
+  let hoverId = null;
   let activeId = null;
+  let mouseX = null;
+  let mouseY = null;
 
   const drawerEl = document.getElementById('drawer');
   const drawerYardEl = document.getElementById('drawerYard');
@@ -620,7 +633,9 @@
     return nearestDist <= PROXIMITY_RADIUS ? nearest : null;
   }
 
-  function setActiveEntry(entry) {
+  // Updates the drawer/scoreboard DOM only — no sound. Sound is triggered
+  // separately, only when the player physically reaches a stop.
+  function renderDrawer(entry) {
     if (!entry) {
       drawerEl.classList.remove('open');
       scoreboardEl.textContent = '—';
@@ -632,11 +647,31 @@
     drawerBodyEl.innerHTML = renderBody(entry.body);
     drawerEl.classList.add('open');
     scoreboardEl.textContent = entry.plate + ' — ' + entry.title;
+  }
 
-    playBlip();
-    if (entry.category === 'project' || entry.category === 'contact') {
-      playJingle();
+  canvas.addEventListener('pointermove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    mouseX = e.clientX - rect.left;
+    mouseY = e.clientY - rect.top;
+  });
+  canvas.addEventListener('pointerleave', () => {
+    mouseX = null;
+    mouseY = null;
+  });
+
+  function computeHoverId() {
+    if (mouseX === null) return null;
+    let best = null;
+    let bestDist = Infinity;
+    for (const entry of Z) {
+      const pos = worldToScreen(entry.x, entry.y);
+      const dist = Math.hypot(pos.x - mouseX, pos.y - mouseY);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = entry;
+      }
     }
+    return best && bestDist <= HOVER_RADIUS ? best.id : null;
   }
 
   // Draws one sprite centered on the current bctx origin (0, 0): a helmet,
@@ -805,9 +840,73 @@
     ctx.restore();
   }
 
+  // Jumbotron: mounted over the top stands, drawn on the crisp overlay.
+  // Cycles through project entries when idle, locks to whichever project
+  // the player is standing on, and is clickable to auto-walk there.
+  const PROJECT_ENTRIES = Z.filter((entry) => entry.category === 'project');
+  const JUMBOTRON_CYCLE_INTERVAL = 3;
+  const JUMBOTRON_W = 240;
+  const JUMBOTRON_H = 70;
+  const JUMBOTRON_POS = { x: WORLD_W / 2, y: OUTER_MARGIN + STAND_DEPTH * 0.3 };
+
+  let jumbotronCycleIndex = 0;
+  let jumbotronCycleTimer = 0;
+  let jumbotronLocked = false;
+  let jumbotronFeatured = PROJECT_ENTRIES[0];
+
+  function getJumbotronScreenBox() {
+    const topLeft = worldToScreen(JUMBOTRON_POS.x - JUMBOTRON_W / 2, JUMBOTRON_POS.y - JUMBOTRON_H / 2);
+    return { x: topLeft.x, y: topLeft.y, w: JUMBOTRON_W * PXS, h: JUMBOTRON_H * PXS };
+  }
+
+  function drawJumbotron() {
+    const box = getJumbotronScreenBox();
+    if (box.x + box.w < -50 || box.x > canvas.width + 50 || box.y + box.h < -50 || box.y > canvas.height + 50) return;
+
+    ctx.fillStyle = 'rgba(10, 11, 15, 0.9)';
+    ctx.fillRect(box.x, box.y, box.w, box.h);
+    ctx.strokeStyle = '#3a3d47';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(box.x + 1, box.y + 1, box.w - 2, box.h - 2);
+
+    const pad = 10;
+    ctx.fillStyle = '#05070a';
+    ctx.fillRect(box.x + pad, box.y + pad, box.w - pad * 2, box.h - pad * 2);
+
+    const cx = box.x + box.w / 2;
+    const cy = box.y + box.h / 2;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    ctx.fillStyle = '#f2c744';
+    ctx.font = "bold 16px 'Courier New', monospace";
+    const title = jumbotronFeatured ? jumbotronFeatured.title.toUpperCase() : 'PROJECTS';
+    ctx.fillText(title, cx, cy - 10);
+
+    ctx.font = "12px 'Courier New', monospace";
+    if (jumbotronLocked) {
+      ctx.fillStyle = '#e8e4d2';
+      ctx.fillText('FEATURED', cx, cy + 14);
+    } else if (Math.floor(performance.now() / 500) % 2 === 0) {
+      ctx.fillStyle = '#e8e4d2';
+      ctx.fillText('TAP TO GO', cx, cy + 14);
+    }
+  }
+
+  canvas.addEventListener('pointerdown', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const px = e.clientX - rect.left;
+    const py = e.clientY - rect.top;
+    const box = getJumbotronScreenBox();
+    if (jumbotronFeatured && px >= box.x && px <= box.x + box.w && py >= box.y && py <= box.y + box.h) {
+      moveTarget = { x: jumbotronFeatured.x, y: jumbotronFeatured.y };
+    }
+  });
+
   function drawOverlay() {
     Z.forEach(drawPlate);
     Z.forEach(drawPow);
+    drawJumbotron();
   }
 
   function update(dt) {
@@ -817,6 +916,21 @@
     if (keys.KeyD || keys.ArrowRight) dx += 1;
     if (keys.KeyW || keys.ArrowUp) dy -= 1;
     if (keys.KeyS || keys.ArrowDown) dy += 1;
+
+    const keyHeld = dx !== 0 || dy !== 0;
+    if (keyHeld) {
+      moveTarget = null;
+    } else if (moveTarget) {
+      const tdx = moveTarget.x - P.x;
+      const tdy = moveTarget.y - P.y;
+      const dist = Math.hypot(tdx, tdy);
+      if (dist <= MOVE_ARRIVE_DIST) {
+        moveTarget = null;
+      } else {
+        dx = tdx / dist;
+        dy = tdy / dist;
+      }
+    }
 
     if (dx !== 0 || dy !== 0) {
       const len = Math.hypot(dx, dy);
@@ -851,17 +965,32 @@
       ? (WORLD_H - buf.height) / 2
       : clamp(cam.y, 0, WORLD_H - buf.height);
 
-    // Proximity detection: open/update the drawer when the nearest stop changes.
+    // Proximity detection drives the knockdown and arrival sounds.
     const nearest = findNearest();
-    const nearestId = nearest ? nearest.id : null;
-    if (nearestId !== activeId) {
-      activeId = nearestId;
-      setActiveEntry(nearest);
+    const newProximityId = nearest ? nearest.id : null;
+    if (newProximityId !== proximityId) {
+      proximityId = newProximityId;
+      if (nearest) {
+        playBlip();
+        if (nearest.category === 'project' || nearest.category === 'contact') {
+          playJingle();
+        }
+      }
     }
 
-    // Knockdown: ramp the active defender's knock toward 1, decay the rest.
+    // Hovering a marker also opens its panel — hover wins over proximity
+    // for what's shown, so a mouse user can scout without walking.
+    hoverId = computeHoverId();
+    const displayId = hoverId !== null ? hoverId : proximityId;
+    if (displayId !== activeId) {
+      activeId = displayId;
+      renderDrawer(Z.find((entry) => entry.id === activeId) || null);
+    }
+
+    // Knockdown: ramp the defender the player is physically near toward 1,
+    // decay the rest.
     Z.forEach((entry) => {
-      const target = entry.id === activeId ? 1 : 0;
+      const target = entry.id === proximityId ? 1 : 0;
       const rate = target === 1 ? KNOCK_RAMP_RATE : KNOCK_DECAY_RATE;
       if (entry.knock < target) {
         entry.knock = Math.min(target, entry.knock + rate * dt);
@@ -876,6 +1005,23 @@
         entry._knockedDown = false;
       }
     });
+
+    // Jumbotron: lock to whatever project the player is standing on;
+    // otherwise cycle through the projects on a timer.
+    const proximityEntry = Z.find((entry) => entry.id === proximityId) || null;
+    if (proximityEntry && proximityEntry.category === 'project') {
+      jumbotronLocked = true;
+      jumbotronFeatured = proximityEntry;
+      jumbotronCycleTimer = 0;
+    } else {
+      jumbotronLocked = false;
+      jumbotronCycleTimer += dt;
+      if (jumbotronCycleTimer >= JUMBOTRON_CYCLE_INTERVAL) {
+        jumbotronCycleTimer = 0;
+        jumbotronCycleIndex = (jumbotronCycleIndex + 1) % PROJECT_ENTRIES.length;
+      }
+      jumbotronFeatured = PROJECT_ENTRIES[jumbotronCycleIndex];
+    }
   }
 
   function render(dt) {
