@@ -25,6 +25,181 @@
   const PXS = 3;
   let buf, bctx;
 
+  // Baked, static world image (stadium + field), rebuilt on resize.
+  let world, worldCtx;
+
+  // Field geometry, in world units (not screen pixels).
+  const FIELD_W = 1920;
+  const FIELD_H = 680;
+  const END_ZONE_W = 160;
+  const PLAY_W = FIELD_W - END_ZONE_W * 2;
+
+  // Stadium geometry wrapping the field.
+  const OUTER_MARGIN = 40;
+  const STAND_DEPTH = 170;
+  const APRON = 40;
+
+  const FIELD_X = OUTER_MARGIN + STAND_DEPTH + APRON;
+  const FIELD_Y = OUTER_MARGIN + STAND_DEPTH + APRON;
+
+  const WORLD_W = FIELD_W + FIELD_X * 2;
+  const WORLD_H = FIELD_H + FIELD_Y * 2;
+
+  const STAND_TOP = { x: OUTER_MARGIN, y: OUTER_MARGIN, w: WORLD_W - OUTER_MARGIN * 2, h: STAND_DEPTH };
+  const STAND_BOTTOM = { x: OUTER_MARGIN, y: WORLD_H - OUTER_MARGIN - STAND_DEPTH, w: WORLD_W - OUTER_MARGIN * 2, h: STAND_DEPTH };
+  const STAND_LEFT = { x: OUTER_MARGIN, y: OUTER_MARGIN + STAND_DEPTH, w: STAND_DEPTH, h: WORLD_H - (OUTER_MARGIN + STAND_DEPTH) * 2 };
+  const STAND_RIGHT = { x: WORLD_W - OUTER_MARGIN - STAND_DEPTH, y: OUTER_MARGIN + STAND_DEPTH, w: STAND_DEPTH, h: WORLD_H - (OUTER_MARGIN + STAND_DEPTH) * 2 };
+  const STANDS = [STAND_TOP, STAND_BOTTOM, STAND_LEFT, STAND_RIGHT];
+
+  // Maps 0..100 yards, measured from the left goal line, to a world x.
+  function ydx(yards) {
+    return FIELD_X + END_ZONE_W + (yards / 100) * PLAY_W;
+  }
+
+  const COLOR_BG = '#14161d';
+  const COLOR_STRIPE_A = '#5aa96a';
+  const COLOR_STRIPE_B = '#4c9a5d';
+  const COLOR_ENDZONE = '#cf3b3b';
+  const COLOR_LINE = '#e8e4d2';
+  const COLOR_WHITE = '#ffffff';
+  const COLOR_STAND = '#23262f';
+  const COLOR_PLAYER = '#f2c744';
+
+  const CROWD_PALETTE = ['#cf3b3b', '#e8e4d2', '#d4af37', '#3b5fcf', '#8a2f2f', '#2f4f8a'];
+
+  const YARD_NUMBERS = [10, 20, 30, 40, 50, 40, 30, 20, 10];
+
+  function drawField(c) {
+    // Mowing stripes.
+    const stripeCount = 22;
+    const stripeW = FIELD_W / stripeCount;
+    for (let i = 0; i < stripeCount; i++) {
+      c.fillStyle = i % 2 === 0 ? COLOR_STRIPE_A : COLOR_STRIPE_B;
+      c.fillRect(FIELD_X + i * stripeW, FIELD_Y, stripeW, FIELD_H);
+    }
+
+    // End zones.
+    c.fillStyle = COLOR_ENDZONE;
+    c.fillRect(FIELD_X, FIELD_Y, END_ZONE_W, FIELD_H);
+    c.fillRect(FIELD_X + FIELD_W - END_ZONE_W, FIELD_Y, END_ZONE_W, FIELD_H);
+
+    // Sideline border.
+    c.strokeStyle = COLOR_WHITE;
+    c.lineWidth = 4;
+    c.strokeRect(FIELD_X + 2, FIELD_Y + 2, FIELD_W - 4, FIELD_H - 4);
+
+    // Goal lines.
+    c.beginPath();
+    c.moveTo(ydx(0), FIELD_Y);
+    c.lineTo(ydx(0), FIELD_Y + FIELD_H);
+    c.moveTo(ydx(100), FIELD_Y);
+    c.lineTo(ydx(100), FIELD_Y + FIELD_H);
+    c.stroke();
+
+    // Yard lines every 5 yards.
+    c.strokeStyle = COLOR_LINE;
+    c.lineWidth = 2;
+    for (let yards = 5; yards < 100; yards += 5) {
+      const x = ydx(yards);
+      c.beginPath();
+      c.moveTo(x, FIELD_Y);
+      c.lineTo(x, FIELD_Y + FIELD_H);
+      c.stroke();
+    }
+
+    // Yard numbers, near the top and bottom.
+    c.fillStyle = COLOR_WHITE;
+    c.font = 'bold 40px sans-serif';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    YARD_NUMBERS.forEach((num, i) => {
+      const x = ydx((i + 1) * 10);
+      c.fillText(String(num), x, FIELD_Y + 60);
+      c.fillText(String(num), x, FIELD_Y + FIELD_H - 60);
+    });
+
+    // Hash marks: short ticks every yard at ~34% and ~66% down the field.
+    c.strokeStyle = COLOR_LINE;
+    c.lineWidth = 2;
+    const hashY1 = FIELD_Y + FIELD_H * 0.34;
+    const hashY2 = FIELD_Y + FIELD_H * 0.66;
+    const hashLen = 10;
+    for (let yards = 0; yards <= 100; yards++) {
+      const x = ydx(yards);
+      c.beginPath();
+      c.moveTo(x, hashY1 - hashLen / 2);
+      c.lineTo(x, hashY1 + hashLen / 2);
+      c.moveTo(x, hashY2 - hashLen / 2);
+      c.lineTo(x, hashY2 + hashLen / 2);
+      c.stroke();
+    }
+  }
+
+  // Dense crowd of small pixel blocks, skipping some cells for aisles
+  // and empty seats.
+  function paintCrowd(rect) {
+    const cell = 8;
+    const cols = Math.floor(rect.w / cell);
+    const rows = Math.floor(rect.h / cell);
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        if (col % 9 === 4 || row % 9 === 4) continue; // aisles
+        if (Math.random() < 0.12) continue; // empty seats
+        worldCtx.fillStyle = CROWD_PALETTE[Math.floor(Math.random() * CROWD_PALETTE.length)];
+        worldCtx.fillRect(rect.x + col * cell, rect.y + row * cell, cell - 1, cell - 1);
+      }
+    }
+  }
+
+  function drawBanner(x, y, w, h, text) {
+    worldCtx.fillStyle = '#12141a';
+    worldCtx.fillRect(x, y, w, h);
+    worldCtx.strokeStyle = COLOR_WHITE;
+    worldCtx.lineWidth = 1;
+    worldCtx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    worldCtx.fillStyle = COLOR_WHITE;
+    worldCtx.font = 'bold 14px sans-serif';
+    worldCtx.textAlign = 'center';
+    worldCtx.textBaseline = 'middle';
+    worldCtx.fillText(text, x + w / 2, y + h / 2);
+  }
+
+  function drawBanners() {
+    const bannerW = 340;
+    const bannerH = 22;
+    const cx = WORLD_W / 2;
+    const topY = OUTER_MARGIN + STAND_DEPTH + (APRON - bannerH) / 2;
+    const bottomY = FIELD_Y + FIELD_H + (APRON - bannerH) / 2;
+
+    drawBanner(cx - bannerW / 2, topY, bannerW, bannerH, 'PORTFOLIO-V2');
+    drawBanner(cx - bannerW / 2, bottomY, bannerW, bannerH, 'VICTOROLATUNJI27');
+  }
+
+  function buildWorld() {
+    world = document.createElement('canvas');
+    world.width = WORLD_W;
+    world.height = WORLD_H;
+    worldCtx = world.getContext('2d');
+    worldCtx.imageSmoothingEnabled = false;
+
+    // Dark background.
+    worldCtx.fillStyle = COLOR_BG;
+    worldCtx.fillRect(0, 0, WORLD_W, WORLD_H);
+
+    // Stands and crowd.
+    STANDS.forEach((rect) => {
+      worldCtx.fillStyle = COLOR_STAND;
+      worldCtx.fillRect(rect.x, rect.y, rect.w, rect.h);
+      paintCrowd(rect);
+    });
+
+    // Field, baked on top.
+    drawField(worldCtx);
+
+    // Banners on the inner railings.
+    drawBanners();
+  }
+
   function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
@@ -34,38 +209,17 @@
     buf.height = Math.ceil(window.innerHeight / PXS);
     bctx = buf.getContext('2d');
     bctx.imageSmoothingEnabled = false;
+
+    buildWorld();
   }
-  window.addEventListener('resize', resize);
-  resize();
-
-  // Field geometry, in world units (not screen pixels).
-  const WORLD_W = 1920;
-  const WORLD_H = 680;
-  const END_ZONE_W = 160;
-  const PLAY_W = WORLD_W - END_ZONE_W * 2;
-
-  // Maps 0..100 yards, measured from the left goal line, to a world x.
-  function ydx(yards) {
-    return END_ZONE_W + (yards / 100) * PLAY_W;
-  }
-
-  const COLOR_BG = '#14161d';
-  const COLOR_STRIPE_A = '#5aa96a';
-  const COLOR_STRIPE_B = '#4c9a5d';
-  const COLOR_ENDZONE = '#cf3b3b';
-  const COLOR_LINE = '#e8e4d2';
-  const COLOR_WHITE = '#ffffff';
-
-  const YARD_NUMBERS = [10, 20, 30, 40, 50, 40, 30, 20, 10];
 
   // Player.
   const PLAYER_W = 20;
   const PLAYER_H = 32;
-  const COLOR_PLAYER = '#f2c744';
 
   const P = {
-    x: WORLD_W / 2,
-    y: WORLD_H / 2,
+    x: FIELD_X + FIELD_W / 2,
+    y: FIELD_Y + FIELD_H / 2,
     speed: 320,
     face: 1,
   };
@@ -97,72 +251,6 @@
     }
   });
 
-  function drawField() {
-    // Mowing stripes.
-    const stripeCount = 22;
-    const stripeW = WORLD_W / stripeCount;
-    for (let i = 0; i < stripeCount; i++) {
-      bctx.fillStyle = i % 2 === 0 ? COLOR_STRIPE_A : COLOR_STRIPE_B;
-      bctx.fillRect(i * stripeW, 0, stripeW, WORLD_H);
-    }
-
-    // End zones.
-    bctx.fillStyle = COLOR_ENDZONE;
-    bctx.fillRect(0, 0, END_ZONE_W, WORLD_H);
-    bctx.fillRect(WORLD_W - END_ZONE_W, 0, END_ZONE_W, WORLD_H);
-
-    // Sideline border.
-    bctx.strokeStyle = COLOR_WHITE;
-    bctx.lineWidth = 4;
-    bctx.strokeRect(2, 2, WORLD_W - 4, WORLD_H - 4);
-
-    // Goal lines.
-    bctx.beginPath();
-    bctx.moveTo(ydx(0), 0);
-    bctx.lineTo(ydx(0), WORLD_H);
-    bctx.moveTo(ydx(100), 0);
-    bctx.lineTo(ydx(100), WORLD_H);
-    bctx.stroke();
-
-    // Yard lines every 5 yards.
-    bctx.strokeStyle = COLOR_LINE;
-    bctx.lineWidth = 2;
-    for (let yards = 5; yards < 100; yards += 5) {
-      const x = ydx(yards);
-      bctx.beginPath();
-      bctx.moveTo(x, 0);
-      bctx.lineTo(x, WORLD_H);
-      bctx.stroke();
-    }
-
-    // Yard numbers, near the top and bottom.
-    bctx.fillStyle = COLOR_WHITE;
-    bctx.font = 'bold 40px sans-serif';
-    bctx.textAlign = 'center';
-    bctx.textBaseline = 'middle';
-    YARD_NUMBERS.forEach((num, i) => {
-      const x = ydx((i + 1) * 10);
-      bctx.fillText(String(num), x, 60);
-      bctx.fillText(String(num), x, WORLD_H - 60);
-    });
-
-    // Hash marks: short ticks every yard at ~34% and ~66% down the field.
-    bctx.strokeStyle = COLOR_LINE;
-    bctx.lineWidth = 2;
-    const hashY1 = WORLD_H * 0.34;
-    const hashY2 = WORLD_H * 0.66;
-    const hashLen = 10;
-    for (let yards = 0; yards <= 100; yards++) {
-      const x = ydx(yards);
-      bctx.beginPath();
-      bctx.moveTo(x, hashY1 - hashLen / 2);
-      bctx.lineTo(x, hashY1 + hashLen / 2);
-      bctx.moveTo(x, hashY2 - hashLen / 2);
-      bctx.lineTo(x, hashY2 + hashLen / 2);
-      bctx.stroke();
-    }
-  }
-
   function drawPlayer() {
     bctx.fillStyle = COLOR_PLAYER;
     bctx.fillRect(P.x - PLAYER_W / 2, P.y - PLAYER_H / 2, PLAYER_W, PLAYER_H);
@@ -188,8 +276,8 @@
     if (dx > 0) P.face = 1;
     else if (dx < 0) P.face = -1;
 
-    P.x = clamp(P.x, PLAYER_W / 2, WORLD_W - PLAYER_W / 2);
-    P.y = clamp(P.y, PLAYER_H / 2, WORLD_H - PLAYER_H / 2);
+    P.x = clamp(P.x, FIELD_X + PLAYER_W / 2, FIELD_X + FIELD_W - PLAYER_W / 2);
+    P.y = clamp(P.y, FIELD_Y + PLAYER_H / 2, FIELD_Y + FIELD_H - PLAYER_H / 2);
 
     // Ease the camera toward centering on the player.
     const targetX = P.x - buf.width / 2;
@@ -213,13 +301,16 @@
 
     bctx.save();
     bctx.translate(-cam.x, -cam.y);
-    drawField();
+    bctx.drawImage(world, 0, 0);
     drawPlayer();
     bctx.restore();
 
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(buf, 0, 0, buf.width * PXS, buf.height * PXS);
   }
+
+  window.addEventListener('resize', resize);
+  resize();
 
   let lastTime = performance.now();
   function loop(now) {
