@@ -1,1320 +1,435 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Field</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Victor Olatunji — Retro Field Portfolio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
 <style>
-  html, body {
-    margin: 0;
-    height: 100%;
-    overflow: hidden;
+  :root{
+    --bg:#14161d; --stand:#23262f; --cream:#e9e2cd; --cream-d:#d3ccb4;
+    --ink:#22201c; --red:#cf3b3b; --gold:#f2b23e; --teal:#3fb6a8;
+    --orange:#e8843c; --purple:#9a7bd4; --blue:#2f6fd0; --yellow:#ffd21e;
   }
-  canvas {
-    display: block;
-    image-rendering: pixelated;
-  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);overflow:hidden;font-family:'VT323',monospace;color:var(--ink);}
+  #stage{position:fixed;inset:0}
+  canvas{display:block;width:100%;height:100%;image-rendering:pixelated;touch-action:none}
+  .crt{position:fixed;inset:0;z-index:4;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.16) 0 2px,rgba(0,0,0,0) 2px 4px);mix-blend-mode:multiply;opacity:.5}
+  .vig{position:fixed;inset:0;z-index:4;pointer-events:none;background:radial-gradient(120% 120% at 50% 45%,rgba(0,0,0,0) 55%,rgba(0,0,0,.55))}
+  .panel{background:var(--cream);border:3px solid var(--ink);box-shadow:5px 5px 0 rgba(0,0,0,.55);}
 
-  /* Retro cream-card look: 3px dark border, hard offset shadow, no blur. */
-  #scoreboard, #drawer, #soundToggle, .intro-card {
-    background: #e8e4d2;
-    color: #1a1714;
-    border: 3px solid #1a1714;
-    box-shadow: 6px 6px 0 #1a1714;
-  }
+  .brand{position:fixed;left:16px;top:14px;z-index:6;pointer-events:none}
+  .brand .name{font-family:'Press Start 2P';font-size:13px;color:var(--cream);text-shadow:3px 3px 0 var(--ink);line-height:1.4}
+  .brand .name b{color:var(--gold)}
+  .brand .sub{font-size:19px;color:var(--cream-d);margin-top:6px}
 
-  #scoreboard {
-    position: fixed;
-    top: 12px;
-    left: 12px;
-    padding: 10px 14px;
-    font-family: 'Press Start 2P', monospace;
-    font-size: 10px;
-    letter-spacing: 0.03em;
-    line-height: 1.6;
-    z-index: 10;
-  }
+  .scoreboard{position:fixed;left:16px;bottom:16px;z-index:6;padding:11px 13px;min-width:214px}
+  .scoreboard .eyebrow{font-family:'Press Start 2P';font-size:8px;color:var(--red)}
+  .scoreboard .drive{font-family:'Press Start 2P';font-size:12px;margin:9px 0 4px;line-height:1.35}
+  .scoreboard .yard{font-size:18px;color:#5c5646;line-height:1}
+  .keys{display:flex;gap:5px;margin-top:10px;align-items:center}
+  .key{font-family:'Press Start 2P';font-size:8px;background:var(--ink);color:var(--cream);padding:6px 7px;box-shadow:2px 2px 0 rgba(0,0,0,.4)}
+  .keys .lbl{font-size:17px;color:#5c5646;margin-left:5px}
+  .sound{margin-top:10px;width:100%;font-family:'Press Start 2P';font-size:8px;cursor:pointer;background:var(--ink);color:var(--cream);border:none;padding:9px;text-align:left;box-shadow:3px 3px 0 rgba(0,0,0,.4)}
+  .sound:active{transform:translate(2px,2px);box-shadow:1px 1px 0 rgba(0,0,0,.4)}
 
-  #drawer {
-    position: fixed;
-    top: 0;
-    right: 0;
-    width: 320px;
-    max-width: 85vw;
-    height: 100%;
-    box-sizing: border-box;
-    padding: 28px 24px;
-    font-family: 'VT323', monospace;
-    border-top: none;
-    border-bottom: none;
-    border-right: none;
-    box-shadow: -6px 0 0 #1a1714;
-    transform: translateX(100%);
-    transition: transform 0.25s ease, background 0.2s ease;
-    overflow-y: auto;
-    z-index: 10;
-  }
-  #drawer.open {
-    transform: translateX(0);
-  }
-  #drawer.about-active {
-    background: linear-gradient(160deg, #cf3b3b 0%, #f2c744 100%);
-    color: #1a1714;
-  }
-  #drawer .drawer-yard {
-    font-family: 'Press Start 2P', monospace;
-    font-size: 11px;
-    letter-spacing: 0.05em;
-    color: #8a5a1a;
-    margin-bottom: 10px;
-  }
-  #drawer h2 {
-    font-family: 'Press Start 2P', monospace;
-    margin: 0 0 10px;
-    font-size: 16px;
-    line-height: 1.5;
-  }
-  #drawer .drawer-meta {
-    font-size: 18px;
-    color: #3a352d;
-    margin-bottom: 16px;
-  }
-  #drawer .drawer-body {
-    font-size: 20px;
-    line-height: 1.35;
-  }
-  #drawer .tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-  #drawer .tag {
-    padding: 3px 10px;
-    background: #1a1714;
-    color: #e8e4d2;
-    border: 2px solid #1a1714;
-    border-radius: 0;
-    font-family: 'Press Start 2P', monospace;
-    font-size: 9px;
-  }
-  #drawer .links {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-  #drawer .links li + li {
-    margin-top: 10px;
-  }
-  #drawer .links a {
-    display: inline-block;
-    color: #1a1714;
-    font-size: 20px;
-    text-decoration: none;
-    border-bottom: 2px solid #1a1714;
-  }
-  #drawer .links a:hover {
-    background: #1a1714;
-    color: #e8e4d2;
-  }
+  .drawer{position:fixed;top:0;right:0;height:100%;width:min(400px,90vw);z-index:8;background:var(--cream);border-left:5px solid var(--ink);box-shadow:-8px 0 0 rgba(0,0,0,.35);transform:translateX(103%);transition:transform .12s steps(4);padding:22px 22px;overflow-y:auto}
+  .drawer.open{transform:translateX(0)}
+  .drawer .tab{display:inline-block;font-family:'Press Start 2P';font-size:8px;color:var(--ink);padding:7px 9px}
+  .drawer .yardtag{float:right;font-family:'Press Start 2P';font-size:8px;color:#7a7460;margin-top:2px}
+  .drawer h2{font-family:'Press Start 2P';font-size:14px;line-height:1.45;margin:16px 0 6px}
+  .drawer .meta{font-size:19px;color:#57513f;margin-bottom:14px;line-height:1.12}
+  .drawer .body{font-size:20px;line-height:1.2;color:#2c281f}
+  .drawer .body p{margin:0 0 9px}
+  .drawer .body b{color:var(--ink)}
+  .drawer .hint{font-size:17px;color:#7a7460;margin-top:14px}
+  .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .tag{font-size:16px;background:var(--cream-d);border:2px solid var(--ink);padding:2px 7px;line-height:1.15}
+  .links{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+  .links a{display:flex;justify-content:space-between;text-decoration:none;font-size:18px;color:var(--ink);background:var(--gold);border:2px solid var(--ink);padding:9px 11px;box-shadow:3px 3px 0 rgba(0,0,0,.35)}
+  .links a span:last-child{color:#5c4a1e}
 
-  #soundToggle {
-    position: fixed;
-    top: 54px;
-    left: 12px;
-    padding: 8px 14px;
-    font-family: 'Press Start 2P', monospace;
-    font-size: 10px;
-    letter-spacing: 0.03em;
-    cursor: pointer;
-    z-index: 10;
-  }
-  #soundToggle:active {
-    box-shadow: 3px 3px 0 #1a1714;
-    transform: translate(3px, 3px);
-  }
+  /* stat card */
+  .card{background:linear-gradient(135deg,#cf3b3b 0%,#e8843c 50%,#ffd21e 100%);border:3px solid var(--ink);box-shadow:4px 4px 0 rgba(0,0,0,.5);padding:14px;display:flex;gap:14px;align-items:flex-start}
+  .card svg{width:78px;height:96px;image-rendering:pixelated;flex:0 0 auto}
+  .card .info{flex:1}
+  .card .nm{font-family:'Press Start 2P';font-size:11px;color:#fff;line-height:1.5;text-shadow:2px 2px 0 rgba(0,0,0,.45)}
+  .card .su{font-size:16px;color:#fff;line-height:1.15;margin-top:8px;text-shadow:1px 1px 0 rgba(0,0,0,.4)}
+  .bars{margin-top:12px}
+  .bar{margin-bottom:9px}
+  .bar .bl{font-family:'Press Start 2P';font-size:7px;color:#fff;margin-bottom:3px;text-shadow:1px 1px 0 rgba(0,0,0,.5)}
+  .bar .bt{height:14px;border:2px solid var(--ink);background:#1b2a44}
+  .bar .bf{height:100%;background:var(--yellow)}
 
-  /* On-screen d-pad: JS reveals it only on touch devices. */
-  #dpad {
-    display: none;
-    position: fixed;
-    bottom: 24px;
-    left: 24px;
-    grid-template-columns: repeat(3, 52px);
-    grid-template-rows: repeat(3, 52px);
-    grid-template-areas: ". up ." "left . right" ". down .";
-    gap: 4px;
-    z-index: 20;
-  }
-  #dpad.visible {
-    display: grid;
-  }
-  .dpad-btn {
-    background: #e8e4d2;
-    color: #1a1714;
-    border: 3px solid #1a1714;
-    box-shadow: 3px 3px 0 #1a1714;
-    font-size: 18px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    touch-action: none;
-    user-select: none;
-    -webkit-user-select: none;
-  }
-  .dpad-btn:active {
-    box-shadow: 1px 1px 0 #1a1714;
-    transform: translate(2px, 2px);
-  }
-  .dpad-up { grid-area: up; }
-  .dpad-down { grid-area: down; }
-  .dpad-left { grid-area: left; }
-  .dpad-right { grid-area: right; }
+  .intro{position:fixed;inset:0;z-index:20;display:grid;place-items:center;text-align:center;background:rgba(12,13,18,.88)}
+  .intro.hide{display:none}
+  .intro .box{padding:26px 22px;max-width:520px}
+  .intro .kick{font-family:'Press Start 2P';font-size:9px;color:var(--gold)}
+  .intro h1{font-family:'Press Start 2P';font-size:clamp(20px,6vw,38px);color:var(--cream);line-height:1.35;margin:16px 0 14px;text-shadow:4px 4px 0 var(--ink)}
+  .intro p{font-size:22px;color:var(--cream-d);max-width:460px;margin:0 auto 22px;line-height:1.18}
+  .intro .cta{font-family:'Press Start 2P';font-size:12px;color:var(--ink);background:var(--gold);border:3px solid var(--ink);padding:15px 24px;cursor:pointer;box-shadow:5px 5px 0 rgba(0,0,0,.6);animation:blink 1s steps(1) infinite}
+  .intro .cta:active{transform:translate(3px,3px);box-shadow:2px 2px 0 rgba(0,0,0,.6)}
+  @keyframes blink{50%{background:var(--cream)}}
+  .intro .small{font-size:17px;color:#8a8472;margin-top:14px}
 
-  /* Full-screen CRT scanlines + vignette. */
-  #crtOverlay {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 6;
-    background:
-      repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.14) 0px, rgba(0, 0, 0, 0.14) 1px, transparent 1px, transparent 3px),
-      radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 45%, rgba(0, 0, 0, 0.55) 100%);
-  }
-
-  /* "Press Start" intro screen. */
-  #intro {
-    position: fixed;
-    inset: 0;
-    z-index: 50;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(10, 11, 15, 0.94);
-    transition: opacity 0.4s ease;
-  }
-  #intro.hidden {
-    opacity: 0;
-    pointer-events: none;
-  }
-  .intro-card {
-    padding: 36px 44px;
-    text-align: center;
-    font-family: 'Press Start 2P', monospace;
-  }
-  .intro-card h1 {
-    margin: 0 0 20px;
-    font-size: 18px;
-    line-height: 1.6;
-    color: #cf3b3b;
-  }
-  .intro-card .blink {
-    font-size: 13px;
-    color: #1a1714;
-    animation: intro-blink 1s steps(1) infinite;
-  }
-  @keyframes intro-blink {
-    50% { opacity: 0; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .intro-card .blink {
-      animation: none;
-    }
-  }
-
-  /* About stop: pixel helmet + stat-bar trading card. */
-  .stat-card {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-  }
-  .stat-card .pixel-helmet {
-    width: 64px;
-    height: 64px;
-    image-rendering: pixelated;
-    margin-bottom: 10px;
-  }
-  .stat-card .stat-name {
-    font-family: 'Press Start 2P', monospace;
-    font-size: 12px;
-    margin-bottom: 6px;
-  }
-  .stat-card .stat-school {
-    font-size: 18px;
-    margin-bottom: 16px;
-  }
-  .stat-card .stat-bar {
-    display: grid;
-    grid-template-columns: 70px 1fr;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    margin-bottom: 8px;
-    font-family: 'Press Start 2P', monospace;
-    font-size: 9px;
-    text-align: left;
-  }
-  .stat-card .bar {
-    height: 12px;
-    background: #1a1714;
-    border: 2px solid #1a1714;
-  }
-  .stat-card .bar .fill {
-    height: 100%;
-    background: #f2c744;
-  }
+  .dpad{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:7;display:none;grid-template-columns:repeat(3,50px);grid-template-rows:repeat(2,50px);gap:6px}
+  .dpad button{font-family:'Press Start 2P';font-size:12px;background:var(--cream);color:var(--ink);border:3px solid var(--ink);box-shadow:3px 3px 0 rgba(0,0,0,.5)}
+  .dpad button:active{background:var(--gold);transform:translate(2px,2px)}
+  .dpad .up{grid-column:2;grid-row:1}.dpad .left{grid-column:1;grid-row:2}.dpad .down{grid-column:2;grid-row:2}.dpad .right{grid-column:3;grid-row:2}
+  @media (hover:none) and (pointer:coarse){ .dpad{display:grid} .scoreboard{bottom:auto;top:70px;left:12px;min-width:0} .keys{display:none} }
 </style>
 </head>
 <body>
-<canvas id="field"></canvas>
-<div id="scoreboard">&mdash;</div>
-<button id="soundToggle" type="button">SOUND: ON</button>
-<aside id="drawer">
-  <div class="drawer-yard" id="drawerYard"></div>
-  <h2 id="drawerTitle"></h2>
-  <div class="drawer-meta" id="drawerMeta"></div>
-  <div class="drawer-body" id="drawerBody"></div>
-</aside>
-<div id="dpad">
-  <button class="dpad-btn dpad-up" data-key="ArrowUp" aria-label="Up" type="button">&#9650;</button>
-  <button class="dpad-btn dpad-left" data-key="ArrowLeft" aria-label="Left" type="button">&#9664;</button>
-  <button class="dpad-btn dpad-right" data-key="ArrowRight" aria-label="Right" type="button">&#9654;</button>
-  <button class="dpad-btn dpad-down" data-key="ArrowDown" aria-label="Down" type="button">&#9660;</button>
+<div id="stage"><canvas id="field"></canvas></div>
+<div class="crt"></div><div class="vig"></div>
+
+<div class="brand">
+  <div class="name">VICTOR <b>OLATUNJI</b></div>
+  <div class="sub">CS @ Maryland · field portfolio</div>
 </div>
-<div id="crtOverlay"></div>
-<div id="intro">
-  <div class="intro-card">
-    <h1>PORTFOLIO-V2</h1>
-    <div class="blink">PRESS START</div>
+
+<div class="scoreboard panel">
+  <div class="eyebrow">FIELD POS</div>
+  <div class="drive" id="driveLabel">OWN GOAL</div>
+  <div class="yard" id="yardLabel">run into a defender to scout it</div>
+  <div class="keys"><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span><span class="lbl">/ arrows</span></div>
+  <button class="sound" id="soundBtn" aria-pressed="true">SOUND: ON</button>
+</div>
+
+<aside class="drawer" id="drawer" aria-live="polite"></aside>
+
+<div class="dpad">
+  <button class="up" data-k="up">▲</button><button class="left" data-k="left">◀</button>
+  <button class="down" data-k="down">▼</button><button class="right" data-k="right">▶</button>
+</div>
+
+<div class="intro" id="intro">
+  <div class="box">
+    <div class="kick">1ST &amp; 10 · HOME CROWD ROARING</div>
+    <h1>DRIVE DOWN<br>THE FIELD</h1>
+    <p>I played safety and receiver, and this is my creative way of combining my football interest, bringing it to life as an aspiring software engineer.</p>
+    <button class="cta" id="snap">PRESS START</button>
+    <div class="small">WASD / arrows · tap d-pad on mobile · hover a defender to scout</div>
   </div>
 </div>
+
 <script>
-  const canvas = document.getElementById('field');
-  const ctx = canvas.getContext('2d');
+(() => {
+  const cv=document.getElementById('field'), ctx=cv.getContext('2d');
+  const RESUME_URI="resume.pdf";
+  const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // When set, skip camera easing, leg animation, crowd sparkle, and blinking.
-  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const OM=30, SD=170, AP=26, EZ=160;
+  const FX=OM+SD+AP, FY=OM+SD+AP, FW=1980, FH=680;
+  const W={ w:FX+FW+AP+SD+OM, h:FY+FH+AP+SD+OM };
+  const glL=FX+EZ, glR=FX+FW-EZ, MIDX=(glL+glR)/2, MIDY=FY+FH/2;
+  const ydx=y=>glL+y*(glR-glL)/100;
+  const standRegions=[
+    {x:OM,y:OM,w:W.w-2*OM,h:SD},{x:OM,y:W.h-OM-SD,w:W.w-2*OM,h:SD},
+    {x:OM,y:OM+SD,w:SD,h:W.h-2*OM-2*SD},{x:W.w-OM-SD,y:OM+SD,w:SD,h:W.h-2*OM-2*SD}];
+  const C={about:'#f2b23e',skills:'#3fb6a8',exp:'#e8843c',lead:'#9a7bd4',proj:'#cf3b3b',contact:'#f2b23e',school:'#f2b23e'};
+  const catName={about:'PLAYER CARD',skills:'SKILLS',exp:'EXPERIENCE',lead:'LEADERSHIP',proj:'PROJECTS',contact:'END ZONE',school:'THE 50'};
 
-  // Low-resolution offscreen buffer for a pixel-art look.
-  const PXS = 3;
-  let buf, bctx;
-
-  // Baked, static world image (stadium + field), rebuilt on resize.
-  let world, worldCtx;
-
-  // Field geometry, in world units (not screen pixels).
-  const FIELD_W = 1920;
-  const FIELD_H = 680;
-  const END_ZONE_W = 160;
-  const PLAY_W = FIELD_W - END_ZONE_W * 2;
-
-  // Stadium geometry wrapping the field.
-  const OUTER_MARGIN = 40;
-  const STAND_DEPTH = 170;
-  const APRON = 40;
-
-  const FIELD_X = OUTER_MARGIN + STAND_DEPTH + APRON;
-  const FIELD_Y = OUTER_MARGIN + STAND_DEPTH + APRON;
-
-  const WORLD_W = FIELD_W + FIELD_X * 2;
-  const WORLD_H = FIELD_H + FIELD_Y * 2;
-
-  const STAND_TOP = { x: OUTER_MARGIN, y: OUTER_MARGIN, w: WORLD_W - OUTER_MARGIN * 2, h: STAND_DEPTH };
-  const STAND_BOTTOM = { x: OUTER_MARGIN, y: WORLD_H - OUTER_MARGIN - STAND_DEPTH, w: WORLD_W - OUTER_MARGIN * 2, h: STAND_DEPTH };
-  const STAND_LEFT = { x: OUTER_MARGIN, y: OUTER_MARGIN + STAND_DEPTH, w: STAND_DEPTH, h: WORLD_H - (OUTER_MARGIN + STAND_DEPTH) * 2 };
-  const STAND_RIGHT = { x: WORLD_W - OUTER_MARGIN - STAND_DEPTH, y: OUTER_MARGIN + STAND_DEPTH, w: STAND_DEPTH, h: WORLD_H - (OUTER_MARGIN + STAND_DEPTH) * 2 };
-  const STANDS = [STAND_TOP, STAND_BOTTOM, STAND_LEFT, STAND_RIGHT];
-
-  // Maps 0..100 yards, measured from the left goal line, to a world x.
-  function ydx(yards) {
-    return FIELD_X + END_ZONE_W + (yards / 100) * PLAY_W;
-  }
-
-  const COLOR_BG = '#14161d';
-  const COLOR_STRIPE_A = '#5aa96a';
-  const COLOR_STRIPE_B = '#4c9a5d';
-  const COLOR_ENDZONE = '#cf3b3b';
-  const COLOR_LINE = '#e8e4d2';
-  const COLOR_WHITE = '#ffffff';
-  const COLOR_STAND = '#23262f';
-
-  const COLOR_HELMET = '#cf3b3b';
-  const COLOR_HELMET_STRIPE = '#e8e4d2';
-  const COLOR_SKIN = '#8a5a3b';
-  const COLOR_FACEMASK = '#8a8a8a';
-  const COLOR_JERSEY = '#1a1714';
-  const COLOR_BALL = '#5c3b22';
-  const COLOR_NAVY = '#1c2b4a';
-  const COLOR_GOLD = '#d4af37';
-  const COLOR_OLIVE = '#5a6b3a';
-
-  const PLAYER_COLORS = {
-    helmet: COLOR_HELMET, stripe: COLOR_HELMET_STRIPE, skin: COLOR_SKIN,
-    mask: COLOR_FACEMASK, jersey: COLOR_JERSEY, pants: COLOR_WHITE,
-  };
-  const DEFENDER_COLORS = {
-    helmet: COLOR_NAVY, stripe: COLOR_WHITE, skin: COLOR_SKIN,
-    mask: COLOR_FACEMASK, jersey: COLOR_WHITE, pants: COLOR_LINE,
-  };
-
-  const CROWD_PALETTE = ['#cf3b3b', '#e8e4d2', '#d4af37', '#3b5fcf', '#8a2f2f', '#2f4f8a'];
-
-  const YARD_NUMBERS = [10, 20, 30, 40, 50, 40, 30, 20, 10];
-
-  const CATEGORY_COLORS = {
-    about: '#3b5fcf',
-    skills: '#d4af37',
-    experience: '#2f8a5a',
-    project: '#cf3b3b',
-    contact: '#e8e4d2',
-  };
-
-  // Content stops, zigzagging down the field. Placeholder copy — swap in
-  // your own bio, skills, experience, and project details.
-  const Z = [
-    {
-      id: 'about', category: 'about',
-      x: FIELD_X + END_ZONE_W / 2, y: FIELD_Y + FIELD_H / 2,
-      yard: 'EZ', plate: 'ABOUT',
-      title: 'Victor Olatunji',
-      meta: 'Computer Science · University of Maryland',
-      body: {
-        html: `
-          <div class="stat-card">
-            <svg class="pixel-helmet" viewBox="0 0 16 16" shape-rendering="crispEdges">
-              <rect x="3" y="1" width="10" height="1" fill="#1a1714"/>
-              <rect x="4" y="2" width="8" height="8" fill="#cf3b3b"/>
-              <rect x="4" y="6" width="8" height="2" fill="#e8e4d2"/>
-              <rect x="10" y="4" width="3" height="4" fill="#8a8a8a"/>
-              <rect x="3" y="10" width="10" height="1" fill="#1a1714"/>
-            </svg>
-            <div class="stat-name">VICTOR OLATUNJI</div>
-            <div class="stat-school">University of Maryland &middot; B.S. Computer Science</div>
-            <div class="stat-bar"><span>HUSTLE</span><div class="bar"><div class="fill" style="width:90%"></div></div></div>
-            <div class="stat-bar"><span>CODE</span><div class="bar"><div class="fill" style="width:88%"></div></div></div>
-            <div class="stat-bar"><span>DESIGN</span><div class="bar"><div class="fill" style="width:74%"></div></div></div>
-            <div class="stat-bar"><span>COFFEE</span><div class="bar"><div class="fill" style="width:99%"></div></div></div>
-          </div>
-        `,
-      },
-    },
-    {
-      id: 'skill-frontend', category: 'skills',
-      x: ydx(10), y: FIELD_Y + FIELD_H * 0.34,
-      yard: '10', plate: 'SKILLS',
-      title: 'Frontend',
-      meta: 'Languages & UI',
-      body: { tags: ['JavaScript', 'HTML/CSS', 'React', 'Canvas API'] },
-    },
-    {
-      id: 'skill-backend', category: 'skills',
-      x: ydx(20), y: FIELD_Y + FIELD_H * 0.66,
-      yard: '20', plate: 'SKILLS',
-      title: 'Backend & Tools',
-      meta: 'Systems & workflow',
-      body: { tags: ['Node.js', 'Python', 'Git', 'SQL'] },
-    },
-    {
-      id: 'exp-umd', category: 'experience',
-      x: ydx(30), y: FIELD_Y + FIELD_H * 0.34,
-      yard: '30', plate: 'EXP',
-      title: 'University of Maryland',
-      meta: 'B.S. Computer Science',
-      body: { html: '<p>Coursework spanning data structures, algorithms, and full-stack web development.</p>' },
-    },
-    {
-      id: 'exp-codepath', category: 'experience',
-      x: ydx(40), y: FIELD_Y + FIELD_H * 0.66,
-      yard: '40', plate: 'EXP',
-      title: 'CodePath TIP102 / WEB102',
-      meta: 'Technical interview prep & full-stack track',
-      body: { html: '<p>Advanced data structures and technical interview practice alongside a full-stack web development track.</p>' },
-    },
-    {
-      id: 'midfield-cs', category: 'experience',
-      x: ydx(50), y: FIELD_Y + FIELD_H / 2,
-      yard: '50', plate: 'CS',
-      title: 'Computer Science Program',
-      meta: 'University of Maryland · Coursework',
-      body: { tags: ['Data Structures', 'Algorithms', 'Systems Programming', 'Databases', 'Software Engineering', 'Web Development'] },
-    },
-    {
-      id: 'proj-lectureloop', category: 'project',
-      x: ydx(50), y: FIELD_Y + FIELD_H * 0.34,
-      yard: '50', plate: 'PROJ',
-      title: 'LectureLoop',
-      meta: 'Web app',
-      body: { links: [{ label: 'GitHub', href: 'https://github.com/victorolatunji27/lectureloop' }] },
-    },
-    {
-      id: 'proj-echosense', category: 'project',
-      x: ydx(60), y: FIELD_Y + FIELD_H * 0.66,
-      yard: '60', plate: 'PROJ',
-      title: 'EchoSense',
-      meta: 'Web app',
-      body: { links: [{ label: 'GitHub', href: 'https://github.com/victorolatunji27/echosense' }] },
-    },
-    {
-      id: 'proj-volterra', category: 'project',
-      x: ydx(70), y: FIELD_Y + FIELD_H * 0.34,
-      yard: '70', plate: 'PROJ',
-      title: 'Volterra AI',
-      meta: 'Web app',
-      body: { links: [{ label: 'GitHub', href: 'https://github.com/victorolatunji27/volterra-ai' }] },
-    },
-    {
-      id: 'proj-portfolio', category: 'project',
-      x: ydx(80), y: FIELD_Y + FIELD_H * 0.66,
-      yard: '80', plate: 'PROJ',
-      title: 'This Stadium',
-      meta: 'Canvas · vanilla JS',
-      body: { links: [{ label: 'GitHub', href: 'https://github.com/victorolatunji27/portfolio-v2' }] },
-    },
-    {
-      id: 'contact', category: 'contact',
-      x: FIELD_X + FIELD_W - END_ZONE_W / 2, y: FIELD_Y + FIELD_H / 2,
-      yard: 'EZ', plate: 'CONTACT',
-      title: "Let's talk",
-      meta: 'Reach out',
-      body: {
-        links: [
-          { label: 'Email', href: 'mailto:volatunj@terpmail.umd.edu' },
-          { label: 'LinkedIn', href: 'https://www.linkedin.com/in/victor-olatunji-914320345/' },
-          { label: 'GitHub', href: 'https://github.com/victorolatunji27' },
-          { label: 'TikTok', href: 'https://www.tiktok.com/@vichackinn' },
-          { label: 'Download Resume (PDF)', href: 'resume.pdf', download: 'Victor Olatunji Resume.pdf' },
-        ],
-      },
-    },
+  // ---- content (from resume) ----
+  const Z=[
+    {id:'about',cat:'about',me:1,x:FX+82,y:MIDY,yard:'OWN GOAL',plate:'PLAYER CARD',title:'VICTOR OLATUNJI',statcard:1},
+    {id:'skills',cat:'skills',def:1,x:ydx(12),y:FY+120,yard:'OWN 12',plate:'SKILLS',title:'TECHNICAL SKILLS',meta:'what I build with',
+     html:`<p><b>Languages:</b> Java, JavaScript, Python, TypeScript.</p><p><b>Frameworks:</b> React, Next.js, Node.js, FastAPI, Tailwind, Vite.</p><p><b>Cloud:</b> AWS (EC2, S3, VPC), Azure, GCP, Firebase, Supabase, Railway, Vercel.</p><p><b>Data + systems:</b> PostgreSQL, Redis, DNS, TCP/IP, HTTP, REST, Linux.</p>`,
+     tags:['Git','Postman','Figma','Agile/Scrum','CI/CD','Anthropic API','Resend']},
+    {id:'dit',cat:'exp',def:1,x:ydx(26),y:FY+FH-120,yard:'OWN 26',plate:'UMD DIT',title:'UMD DIVISION OF IT',meta:'Student Field Technician · Mar 2026 – Present',
+     html:`<p>Diagnose and fix AV, projector, networking, and lecture-capture issues across 50+ classrooms under time-critical SLAs.</p><p>Triage faculty tickets with root-cause analysis to cut instructional downtime.</p><p>Work with full-time IT engineers on infrastructure audits and equipment inspections.</p>`},
+    {id:'h4i',cat:'exp',def:1,x:ydx(38),y:FY+150,yard:'OWN 38',plate:'HACK4IMPACT',title:'HACK4IMPACT',meta:'Full-Stack Developer & Project Designer · Sep 2025 – Jan 2026',
+     html:`<p>Built full-stack apps in React, Firebase, and Node.js for nonprofit clients on two-week Agile sprints.</p><p>Turned client requirements into Figma prototypes for a resource platform serving 200+ users, cutting design iterations by 30%.</p>`},
+    {id:'course',cat:'school',logo:1,x:MIDX,y:MIDY,yard:'MIDFIELD',plate:'MARYLAND CS',title:'MARYLAND · COMPUTER SCIENCE',meta:'B.S. Computer Science · Business minor · Expected May 2029 · College Park',
+     html:`<p><b>Relevant coursework:</b></p><p>Calculus 1–2 · Linear Algebra · Object-Oriented Programming 1–2 · Discrete Structures · Data Structures & Algorithms · Computer Systems.</p>`},
+    {id:'djs',cat:'lead',def:1,x:ydx(58),y:FY+FH-130,yard:'OPP 42',plate:'DATA JUSTICE',title:'DATA JUSTICE SCHOLARS',meta:'Student Ambassador & Peer Mentor · Mar 2026 – Present',
+     html:`<p>Represent the program at prospective-student events.</p><p>Mentor underclassmen on study strategies, academic planning, and university culture in one-on-one check-ins.</p>`},
+    {id:'lead',cat:'lead',def:1,x:ydx(66),y:FY+130,yard:'OPP 34',plate:'LEADERSHIP',title:'LEADERSHIP',meta:'programs and roles',
+     html:`<p><b>NVIDIA Summer Bridge</b> (Jun–Aug 2026): GPU computing, AI infrastructure, and accelerated computing sessions led by NVIDIA engineers.</p><p><b>EY CHARGE</b> (Jun–Jul 2026): 6-week virtual leadership program for student-org leaders.</p><p><b>Code:BLACK — Historian:</b> document chapter history, events, and records.</p><p><b>Adobe Student Brand Ambassador:</b> promote Creative Cloud on campus.</p>`},
+    {id:'c202',cat:'proj',def:1,x:ydx(74),y:FY+FH-130,yard:'OPP 26',plate:'202 CONNECT',title:'202 CONNECT',meta:'AI civic resource platform · BisonHacks, Howard · Feb 2026',
+     html:`<p>Multilingual civic platform on Firebase serving 116,000+ DC residents.</p><p>Ward-level demand heatmap with Leaflet.js, cutting resource-discovery time by 40%.</p><p>Five-factor AI Trust Score via Google AI Studio to surface credible resources.</p>`},
+    {id:'echo',cat:'proj',def:1,x:ydx(82),y:FY+150,yard:'OPP 18',plate:'ECHOSENSE',title:'ECHOSENSE',meta:'Real-time ASL interpreter · 5th, ML track, Bitcamp 2026 · Apr 2026',
+     html:`<p>Browser-native ASL interpreter tracking 21 hand landmarks at 30 fps via MediaPipe WebAssembly, no server round-trips.</p><p>Three modes: Phrase, Spell, Sentence.</p><p>ASL grammar pipeline (Lexer, Parser, LLM evaluator) on Claude Sonnet, with ElevenLabs Turbo v2 voice.</p>`},
+    {id:'volterra',cat:'proj',def:1,x:ydx(90),y:MIDY,yard:'RED ZONE',plate:'VOLTERRAAI',title:'VOLTERRAAI',meta:'AI options research copilot · May 2026 – Present',
+     html:`<p>Multi-agent pipeline pulling options flow from Tradier and market data from yfinance; calls Claude Sonnet with few-shot prompts for JSON trade setups; caches in Redis, cutting redundant API calls ~80%.</p><p>Full-stack app on Railway and Vercel with Supabase JWT auth, a trade journal with outcome tracking, and a daily email digest via Resend to 5 active users.</p><p>Strategy classification agent tags setups across 7 categories and sends alerts on matches.</p>`,
+     tags:['Python','FastAPI','Claude Sonnet','Redis','Supabase','Railway','Vercel']},
+    {id:'contact',cat:'contact',goal:1,x:glR+82,y:MIDY,yard:'TOUCHDOWN',plate:'END ZONE',title:'LET\'S CONNECT',meta:'marker reached. six points.',
+     links:[{label:'EMAIL',sub:'volatunj@terpmail.umd.edu',href:'mailto:volatunj@terpmail.umd.edu'},{label:'LINKEDIN',sub:'/in/victor-olatunji',href:'https://www.linkedin.com/in/victor-olatunji-914320345/'},{label:'GITHUB',sub:'@victorolatunji27',href:'https://github.com/victorolatunji27'},{label:'PHONE',sub:'240-743-7294',href:'tel:2407437294'},{label:'TIKTOK',sub:'@vichackinn',href:'https://www.tiktok.com/@vichackinn?_r=1&_t=ZT-97i7XhfDPfp'},{label:'RESUME',sub:'PDF',href:'#'}]},
   ];
+  const projList=Z.filter(z=>z.cat==='proj');
 
-  // Knockdown state for each defender: ramps 0..1 while active, decays otherwise.
-  Z.forEach((entry) => {
-    entry.knock = 0;
-    entry._knockedDown = false;
+  const P={x:FX+82,y:MIDY,r:14,speed:320,face:1};
+  const cam={x:0,y:0}; const keys={}; const TRIGGER=94;
+  let active=null,started=false,vw=0,vh=0,cheer=0,moveTarget=null,currentJumboProj=projList[0],hoverZone=null;
+
+  // ---- audio ----
+  let actx=null,mg=null,soundOn=true;
+  function initAudio(){ if(actx){actx.resume&&actx.resume();return;} const AC=window.AudioContext||window.webkitAudioContext; if(!AC)return;
+    actx=new AC(); mg=actx.createGain(); mg.gain.value=soundOn?0.4:0; mg.connect(actx.destination); }
+  function tone(f,s,d,ty,v){ if(!actx)return; const o=actx.createOscillator(),g=actx.createGain(); o.type=ty||'square'; o.frequency.value=f; o.connect(g); g.connect(mg);
+    const t0=actx.currentTime+s; g.gain.setValueAtTime(0.0001,t0); g.gain.linearRampToValueAtTime(v||0.4,t0+0.01); g.gain.exponentialRampToValueAtTime(0.0001,t0+d); o.start(t0); o.stop(t0+d+0.03); }
+  function thud(){ tone(150,0,0.14,'square',0.5); tone(90,0.02,0.16,'triangle',0.4); }
+  function blip(){ tone(620,0,0.07,'square',0.35); tone(880,0.05,0.06,'square',0.25); }
+  function score(){ [523,659,784,1047,1319].forEach((f,i)=>tone(f,i*0.08,0.16,'square',0.4)); }
+
+  // ---- baked stadium ----
+  let worldCv=null;
+  function px(g,x,y,w,h,c){ g.fillStyle=c; g.fillRect(x|0,y|0,Math.ceil(w),Math.ceil(h)); }
+  function buildWorld(){
+    worldCv=document.createElement('canvas'); worldCv.width=W.w; worldCv.height=W.h;
+    const g=worldCv.getContext('2d'); g.imageSmoothingEnabled=false;
+    px(g,0,0,W.w,W.h,'#14161d');
+    for(const r of standRegions) px(g,r.x,r.y,r.w,r.h,'#23262f');
+    const pal=['#cf3b3b','#cf3b3b','#e9e2cd','#f2b23e','#4f6bbf','#8fa5d6','#3a3f52','#d98c3f','#9a7bd4'];
+    const bs=8;
+    for(const r of standRegions){ for(let y=r.y+5;y<r.y+r.h-bs;y+=bs+2){ for(let x=r.x+5;x<r.x+r.w-bs;x+=bs+2){
+      if(Math.random()<0.12) continue; if((x-r.x)%170<9||(y-r.y)%140<7) continue; px(g,x,y,bs,bs,pal[(Math.random()*pal.length)|0]); } } }
+    const bn=(cx,cy,w,text,bg,fg,rot)=>{ g.save(); g.translate(cx,cy); if(rot)g.rotate(rot);
+      px(g,-w/2,-15,w,30,bg); px(g,-w/2,-15,w,3,'rgba(255,255,255,.3)'); g.fillStyle=fg; g.font="16px 'VT323',monospace";
+      g.textAlign='center'; g.textBaseline='middle'; g.fillText(text,0,1); g.restore(); };
+    const yT=OM+SD-15,yB=W.h-OM-SD+15;
+    bn(W.w*0.30,yT,210,'VOLTERRAAI','#cf3b3b','#fff',0); bn(W.w*0.55,yT,180,'ECHOSENSE','#f2b23e','#22201c',0); bn(W.w*0.76,yT,200,'202 CONNECT','#cf3b3b','#fff',0);
+    bn(W.w*0.30,yB,150,'GO #29','#f2b23e','#22201c',0); bn(W.w*0.55,yB,270,'DATA JUSTICE SCHOLARS','#cf3b3b','#fff',0); bn(W.w*0.78,yB,190,'HACK4IMPACT','#f2b23e','#22201c',0);
+    bn(OM+SD-15,W.h*0.4,170,'NSBE','#cf3b3b','#fff',-Math.PI/2); bn(OM+SD-15,W.h*0.62,220,'COLORSTACK','#f2b23e','#22201c',-Math.PI/2);
+    bn(W.w-OM-SD+15,W.h*0.4,200,'CODE:BLACK','#cf3b3b','#fff',Math.PI/2); bn(W.w-OM-SD+15,W.h*0.62,190,'MARYLAND','#f2b23e','#22201c',Math.PI/2);
+    px(g,FX-AP,FY-AP,FW+2*AP,FH+2*AP,'#2b402c');
+    const st=22,sw=FW/st; for(let i=0;i<st;i++) px(g,FX+i*sw,FY,sw+1,FH, i%2?'#4c9a5d':'#5aa96a');
+    px(g,FX,FY,EZ,FH,'#cf3b3b'); px(g,FX+FW-EZ,FY,EZ,FH,'#cf3b3b');
+    g.fillStyle='#e8e4d2'; g.fillRect(FX,FY,FW,5); g.fillRect(FX,FY+FH-5,FW,5); g.fillRect(FX,FY,5,FH); g.fillRect(FX+FW-5,FY,5,FH);
+    for(let y=0;y<=100;y+=5){ const x=ydx(y)|0; px(g,x-2,FY,4,FH,'#e8e4d2'); }
+    const h1=FY+FH*0.34,h2=FY+FH*0.66;
+    for(let y=1;y<100;y++){ if(y%5===0)continue; const x=ydx(y)|0; px(g,x-1,h1-4,3,8,'#dcd8c6'); px(g,x-1,h2-4,3,8,'#dcd8c6'); }
+    g.fillStyle='#e8e4d2'; g.font="24px 'VT323',monospace"; g.textAlign='center';
+    [10,20,30,40,50,40,30,20,10].forEach((n,i)=>{ const x=ydx((i+1)*10); g.fillText(n,x,FY+40); g.fillText(n,x,FY+FH-24); });
+    g.fillStyle='#f4efe0'; g.font="30px 'VT323',monospace";
+    g.save(); g.translate(FX+EZ/2,MIDY); g.rotate(-Math.PI/2); g.fillText('VICTOR',0,0); g.restore();
+    g.save(); g.translate(FX+FW-EZ/2,MIDY); g.rotate(Math.PI/2); g.fillText('CONNECT',0,0); g.restore();
+    drawTerp(g,MIDX,MIDY);   // UMD Testudo midfield logo (baked)
+  }
+
+  // UMD Testudo — top-down pixel terrapin
+  function drawTerp(g,cx,cy){
+    const M=[
+      "......KK......",
+      ".....KLLK.....",
+      ".....KEEK.....",
+      "..KKKKKKKKKK..",
+      "LLKSSSSSSSSKLL",
+      "LLKSSSGGSSSKLL",
+      "..KSSGGGGSSK..",
+      "..KSGGGGGGSK..",
+      "..KSSGGGGSSK..",
+      "LLKSSSGGSSSKLL",
+      "LLKSSSSSSSSKLL",
+      "..KKKKKKKKKK..",
+      "......LL......",
+      "......KK......",
+    ];
+    const col={K:'#1a1714',S:'#cf3b3b',G:'#f2b23e',L:'#6b8f3f',E:'#f4efe0'};
+    const CELL=6, cols=14, w=cols*CELL, h=M.length*CELL, sx=cx-w/2, sy=cy-h/2;
+    px(g,cx-w/2+8,cy+h/2-4,w-16,8,'rgba(0,0,0,.22)');
+    for(let r=0;r<M.length;r++){ for(let c=0;c<cols;c++){ const ch=M[r][c];
+      if(ch==='.'||ch===' ') continue; px(g,sx+c*CELL,sy+r*CELL,CELL,CELL,col[ch]); } }
+  }
+
+  // ---- pixel buffer ----
+  let buf=null,bctx=null,PXS=3;
+  function resize(){ vw=innerWidth; vh=innerHeight; cv.width=vw; cv.height=vh; ctx.imageSmoothingEnabled=false;
+    buf=document.createElement('canvas'); buf.width=Math.ceil(vw/PXS); buf.height=Math.ceil(vh/PXS);
+    bctx=buf.getContext('2d'); bctx.imageSmoothingEnabled=false; if(!worldCv) buildWorld(); }
+  addEventListener('resize',resize); resize();
+
+  // ---- input ----
+  const km={KeyW:'up',ArrowUp:'up',KeyS:'down',ArrowDown:'down',KeyA:'left',ArrowLeft:'left',KeyD:'right',ArrowRight:'right'};
+  addEventListener('keydown',e=>{ if(km[e.code]){keys[km[e.code]]=true;e.preventDefault();if(!started)start();} if(e.code==='Escape')closeDrawer(); });
+  addEventListener('keyup',e=>{ if(km[e.code]) keys[km[e.code]]=false; });
+  document.querySelectorAll('.dpad button').forEach(b=>{ const k=b.dataset.k,on=e=>{e.preventDefault();keys[k]=true;if(!started)start();},off=e=>{e.preventDefault();keys[k]=false;};
+    b.addEventListener('touchstart',on,{passive:false}); b.addEventListener('touchend',off,{passive:false}); b.addEventListener('mousedown',on); b.addEventListener('mouseup',off); b.addEventListener('mouseleave',off); });
+  function start(){ started=true; initAudio(); document.getElementById('intro').classList.add('hide'); }
+  document.getElementById('snap').addEventListener('click',start);
+  const soundBtn=document.getElementById('soundBtn');
+  soundBtn.addEventListener('click',()=>{ soundOn=!soundOn; initAudio(); if(mg)mg.gain.value=soundOn?0.4:0; soundBtn.textContent=soundOn?'SOUND: ON':'SOUND: OFF'; soundBtn.setAttribute('aria-pressed',soundOn); });
+
+  const JUMBO={w:150,h:66,x:MIDX-75,y:44};
+  function overRect(cx,cy,r){ const wx=cam.x+cx,wy=cam.y+cy; return wx>=r.x-8&&wx<=r.x+r.w+8&&wy>=r.y-8&&wy<=r.y+r.h+10; }
+  cv.addEventListener('pointerdown',e=>{ if(!started)start(); initAudio();
+    if(overRect(e.clientX,e.clientY,JUMBO)&&currentJumboProj) moveTarget={x:currentJumboProj.x,y:currentJumboProj.y}; });
+  cv.addEventListener('pointermove',e=>{
+    const wx=cam.x+e.clientX, wy=cam.y+e.clientY; let hit=null,bd=70;
+    for(const z of Z){ const d=Math.hypot(z.x-wx,z.y-wy); if(d<bd){bd=d;hit=z;} }
+    hoverZone=hit;
+    cv.style.cursor=(hit||overRect(e.clientX,e.clientY,JUMBO))?'pointer':'default';
   });
+  cv.addEventListener('pointerleave',()=>{ hoverZone=null; });
 
-  // Testudo logo, baked at midfield. Each character in the bitmap maps to a
-  // color; '.' is skipped so the grass shows through. Cell size is a
-  // multiple of PXS so it renders crisp after the buffer is scaled up.
-  const LOGO_CELL = PXS * 2;
-  const LOGO_COLORS = {
-    K: COLOR_JERSEY, // dark outline
-    R: COLOR_ENDZONE, // red shell
-    G: COLOR_GOLD, // gold diamond
-    O: COLOR_OLIVE, // olive head/legs/tail
-    C: COLOR_LINE, // cream eyes
-  };
-  const LOGO_BITMAP = [
-    '.....OOO.....',
-    '....OCOCO....',
-    '.....OOO.....',
-    '...KKKKKKK...',
-    '..KKRRRRRKK..',
-    '.OKRRRRRRRKO.',
-    'OKRRGGGGGRRKO',
-    'OKRRGGGGGRRKO',
-    'OKRRGGGGGRRKO',
-    '.OKRRRRRRRKO.',
-    '..KKRRRRRKK..',
-    '...KKKKKKK...',
-    '......O......',
-  ];
+  // ---- drawer ----
+  const drawer=document.getElementById('drawer');
+  function bars(){ const rows=[['FRONTEND',92],['BACKEND',86],['ALGORITHMS',78],['SHIP RATE',95]];
+    return rows.map(r=>`<div class="bar"><div class="bl">${r[0]}</div><div class="bt"><div class="bf" style="width:${r[1]}%"></div></div></div>`).join(''); }
+  const HELMET=`<svg viewBox="0 0 20 24" shape-rendering="crispEdges"><rect x="5" y="2" width="10" height="4" fill="#cf3b3b"/><rect x="5" y="2" width="10" height="1" fill="#a82c2c"/><rect x="4" y="6" width="12" height="1" fill="#cf3b3b"/><rect x="6" y="6" width="8" height="5" fill="#8a5a3b"/><rect x="6" y="10" width="8" height="1" fill="#d8d3c4"/><rect x="8" y="6" width="1" height="5" fill="#d8d3c4"/><rect x="11" y="6" width="1" height="5" fill="#d8d3c4"/><rect x="4" y="11" width="12" height="8" fill="#1a1714"/><rect x="9" y="13" width="2" height="4" fill="#e9e2cd"/><rect x="2" y="12" width="2" height="6" fill="#8a5a3b"/><rect x="16" y="12" width="2" height="6" fill="#8a5a3b"/><rect x="5" y="19" width="4" height="4" fill="#e9e2cd"/><rect x="11" y="19" width="4" height="4" fill="#e9e2cd"/></svg>`;
+  function openDrawer(z){
+    if(z.statcard){
+      drawer.innerHTML=`<div><span class="tab" style="background:${C[z.cat]}">${catName[z.cat]}</span><span class="yardtag">${z.yard}</span></div>
+        <div class="card" style="margin-top:14px">${HELMET}<div class="info">
+          <div class="nm">VICTOR<br>OLATUNJI</div>
+          <div class="su">CLASS OF 2029<br>UNIVERSITY OF MARYLAND<br>BUSINESS MINOR</div></div></div>
+        <div class="bars">${bars()}</div>
+        <p class="hint">Run into the defenders down the field to scout each stop. Reach the end zone to connect.</p>`;
+      drawer.classList.add('open'); return;
+    }
+    let body=z.html||'';
+    if(z.tags) body+=`<div class="tags">${z.tags.map(t=>`<span class="tag">${t}</span>`).join('')}</div>`;
+    if(z.links) body+=`<div class="links">${z.links.map(l=>{
+      const isResume=l.label==='RESUME';
+      const href=isResume?RESUME_URI:l.href;
+      const extra=isResume?' download="Victor_Olatunji_Resume.pdf"':(l.href.indexOf('http')===0?' target="_blank" rel="noopener"':'');
+      return `<a href="${href}"${extra}><span>${l.label}</span><span>${l.sub}</span></a>`;
+    }).join('')}</div>`;
+    drawer.innerHTML=`<div><span class="tab" style="background:${C[z.cat]}">${catName[z.cat]}</span><span class="yardtag">${z.yard}</span></div>
+      <h2>${z.title}</h2><div class="meta">${z.meta||''}</div><div class="body">${body}</div>`;
+    drawer.classList.add('open');
+  }
+  function closeDrawer(){ drawer.classList.remove('open'); }
+  function setDrive(z){ const dl=document.getElementById('driveLabel'),yl=document.getElementById('yardLabel');
+    if(z){dl.textContent=z.plate;yl.textContent=z.yard;} else {dl.textContent='ON THE MOVE';yl.textContent='run into a defender to scout it';} }
 
-  function drawLogo(c, cx, cy) {
-    const rows = LOGO_BITMAP.length;
-    const cols = LOGO_BITMAP[0].length;
-    const originX = cx - (cols * LOGO_CELL) / 2;
-    const originY = cy - (rows * LOGO_CELL) / 2;
-    for (let row = 0; row < rows; row++) {
-      for (let col = 0; col < cols; col++) {
-        const color = LOGO_COLORS[LOGO_BITMAP[row][col]];
-        if (!color) continue;
-        c.fillStyle = color;
-        c.fillRect(originX + col * LOGO_CELL, originY + row * LOGO_CELL, LOGO_CELL, LOGO_CELL);
-      }
+  // ---- loop ----
+  let last=performance.now(),t=0,logged=false;
+  function frame(now){ const dt=Math.min((now-last)/1000,.05); last=now;
+    try{update(dt);}catch(e){if(!logged){console.error(e);logged=true;}}
+    try{render(dt);}catch(e){if(!logged){console.error(e);logged=true;}} requestAnimationFrame(frame); }
+
+  function update(dt){
+    let dx=(keys.right?1:0)-(keys.left?1:0), dy=(keys.down?1:0)-(keys.up?1:0);
+    if(dx||dy){ moveTarget=null; const m=Math.hypot(dx,dy); dx/=m;dy/=m; if(dx)P.face=dx<0?-1:1; P.x+=dx*P.speed*dt; P.y+=dy*P.speed*dt; }
+    else if(moveTarget){ const mx=moveTarget.x-P.x,my=moveTarget.y-P.y,d=Math.hypot(mx,my); if(d<5)moveTarget=null;
+      else{ const a=Math.atan2(my,mx); if(Math.cos(a))P.face=Math.cos(a)<0?-1:1; const sp=Math.min(P.speed*1.6,d/dt); P.x+=Math.cos(a)*sp*dt; P.y+=Math.sin(a)*sp*dt; } }
+    P.x=Math.max(FX+30,Math.min(FX+FW-30,P.x)); P.y=Math.max(FY+30,Math.min(FY+FH-30,P.y));
+    let tx=P.x-vw/2,ty=P.y-vh/2; tx=Math.max(0,Math.min(W.w-vw,tx)); ty=Math.max(0,Math.min(W.h-vh,ty));
+    if(W.w<vw)tx=(W.w-vw)/2; if(W.h<vh)ty=(W.h-vh)/2;
+    const k=reduceMotion?1:1-Math.pow(.0009,dt); cam.x+=(tx-cam.x)*k; cam.y+=(ty-cam.y)*k;
+
+    let near=null,best=TRIGGER; for(const z of Z){const d=Math.hypot(z.x-P.x,z.y-P.y);if(d<best){best=d;near=z;}}
+    const sel=near||hoverZone;
+    if(sel!==active){ active=sel; if(active){ openDrawer(active); setDrive(active);
+      if(active.def){ thud(); } if(active.cat==='proj'||active.cat==='contact') score(); else if(active.def) blip(); }
+      else { closeDrawer(); setDrive(null); } }
+    // knockdowns
+    for(const z of Z){ if(!z.def) continue; const tgt=(z===active)?1:0; z._k=(z._k||0)+((tgt-(z._k||0))*Math.min(1,dt*(tgt?9:3))); }
+    const feat=active&&active.cat==='proj'; cheer+=((feat?1:0)-cheer)*Math.min(1,dt*3);
+  }
+
+  function render(dt){
+    t+=dt;
+    bctx.setTransform(1,0,0,1,0,0); bctx.clearRect(0,0,buf.width,buf.height);
+    bctx.setTransform(1/PXS,0,0,1/PXS,-cam.x/PXS,-cam.y/PXS);
+    bctx.drawImage(worldCv,0,0);
+    if(!reduceMotion){ const n=6+Math.floor(cheer*22); for(let i=0;i<n;i++){ const r=standRegions[(Math.random()*4)|0];
+      px(bctx,r.x+Math.random()*r.w,r.y+Math.random()*r.h,7,7,'rgba(255,255,235,'+(0.4+Math.random()*0.4)+')'); } }
+
+    // markers: defenders / goalposts (logo already baked)
+    for(const z of Z){ if(z.def) drawDefender(bctx,z); else if(z.goal) drawGoal(bctx,z); }
+    // route dots
+    if(!active){ let n=null,bd=360; for(const z of Z){const d=Math.hypot(z.x-P.x,z.y-P.y);if(d<bd){bd=d;n=z;}}
+      if(n){ const s=Math.floor(bd/26); for(let i=1;i<s;i++){ px(bctx,P.x+(n.x-P.x)*i/s-2,P.y+(n.y-P.y)*i/s-2,4,4,'rgba(233,226,205,.5)'); } } }
+    drawPlayer(bctx);
+    bctx.setTransform(1,0,0,1,0,0); drawMinimap(bctx);
+
+    ctx.imageSmoothingEnabled=false; ctx.clearRect(0,0,vw,vh); ctx.drawImage(buf,0,0,buf.width*PXS,buf.height*PXS);
+
+    // crisp overlay: labels, jumbotron, POW
+    drawLabels(); drawJumbotron();
+  }
+
+  function drawPlayer(g){
+    const x=P.x|0,y=P.y|0,f=P.face,mv=(keys.up||keys.down||keys.left||keys.right||moveTarget),step=(mv&&!reduceMotion)?(Math.floor(t*10)%2):-1;
+    px(g,x-11,y+12,22,4,'rgba(0,0,0,.3)');
+    if(step===1){ px(g,x-6,y+3,5,10,'#e9e2cd'); px(g,x+2,y+3,5,7,'#e9e2cd'); px(g,x+2,y+10,5,3,'#8a5a3b'); }
+    else if(step===0){ px(g,x-6,y+3,5,7,'#e9e2cd'); px(g,x-6,y+10,5,3,'#8a5a3b'); px(g,x+2,y+3,5,10,'#e9e2cd'); }
+    else { px(g,x-6,y+3,5,10,'#e9e2cd'); px(g,x+1,y+3,5,10,'#e9e2cd'); }
+    px(g,x-7,y-4,14,10,'#1a1714');                 // black jersey
+    px(g,x-9,y-3,3,7,'#8a5a3b'); px(g,x+6,y-3,3,7,'#8a5a3b'); // arms
+    px(g,x+(f>0?7:-11),y+1,5,4,'#7a4a2a');          // ball
+    g.fillStyle='#e9e2cd'; g.font="9px 'VT323',monospace"; g.textAlign='center'; g.textBaseline='middle'; g.fillText('29',x,y+2);
+    px(g,x-5,y-13,10,9,'#8a5a3b');                  // face
+    px(g,x-6,y-15,12,6,'#cf3b3b'); px(g,x-6,y-15,12,2,'#a82c2c'); // helmet
+    px(g,x-2,y-15,3,6,'#f4efe0');                    // stripe
+    px(g,x+(f>0?5:-8),y-9,3,4,'#d8d3c4');            // facemask
+  }
+
+  function drawDefender(g,z){
+    const k=z._k||0, dir=(z.x>=P.x?1:-1);
+    g.save();
+    g.translate(z.x + k*30*dir, z.y - Math.sin(k*Math.PI)*16);
+    g.rotate(k*1.5*dir);
+    px(g,-10,12,20,4,`rgba(0,0,0,${0.3*(1-Math.sin(k*Math.PI)*0.7)})`);
+    px(g,-6,4,5,9,'#2c3e78'); px(g,1,4,5,9,'#2c3e78');   // navy legs
+    px(g,-7,-4,14,10,'#e2ddcc');                          // white jersey
+    px(g,-8,-2,2,6,'#8a5a3b'); px(g,6,-2,2,6,'#8a5a3b');  // arms
+    px(g,-5,-13,10,9,'#8a5a3b');                          // face
+    px(g,-6,-15,12,6,'#2c3e78'); px(g,-6,-15,12,2,'#1e2c58'); // navy helmet
+    px(g,(dir>0?-8:5),-9,3,4,'#d8d3c4');                  // facemask toward player
+    g.restore();
+  }
+
+  function drawGoal(g,z){
+    const x=z.x|0,y=z.y|0;
+    px(g,x-2,y-46,4,46,'#f2b23e');            // post
+    px(g,x-22,y-46,44,4,'#f2b23e');           // crossbar
+    px(g,x-22,y-70,4,24,'#f2b23e'); px(g,x+18,y-70,4,24,'#f2b23e'); // uprights
+    px(g,x-16,y+2,32,4,'rgba(0,0,0,.25)');
+  }
+
+  function drawLabels(){
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    for(const z of Z){
+      const sx=z.x-cam.x, sy=z.y-cam.y;
+      if(sx<-90||sx>vw+90||sy<-70||sy>vh+90) continue;
+      const on=z===active, label=z.plate;
+      ctx.font="8px 'Press Start 2P',monospace";
+      const w=Math.max(56, ctx.measureText(label).width+18), py=sy+(z.logo?64:(z.goal?26:30));
+      px(ctx,sx-w/2-2,py-11,w+4,22,'#22201c');
+      px(ctx,sx-w/2,py-9,w,18, on?C[z.cat]:'#e9e2cd');
+      ctx.fillStyle= on?'#1a1714':'#22201c'; ctx.fillText(label,sx,py+1);
+      // POW on a fresh knockdown
+      if(z.def && z._k>0.12 && z._k<0.75){ const jx=(Math.random()-0.5)*4;
+        ctx.font="12px 'Press Start 2P',monospace"; ctx.fillStyle='#22201c'; ctx.fillText('POW!',sx+22+jx,sy-24+1);
+        ctx.fillStyle='#ffd21e'; ctx.fillText('POW!',sx+22+jx,sy-25); }
     }
   }
 
-  function drawField(c) {
-    // Mowing stripes.
-    const stripeCount = 22;
-    const stripeW = FIELD_W / stripeCount;
-    for (let i = 0; i < stripeCount; i++) {
-      c.fillStyle = i % 2 === 0 ? COLOR_STRIPE_A : COLOR_STRIPE_B;
-      c.fillRect(FIELD_X + i * stripeW, FIELD_Y, stripeW, FIELD_H);
-    }
-
-    // End zones.
-    c.fillStyle = COLOR_ENDZONE;
-    c.fillRect(FIELD_X, FIELD_Y, END_ZONE_W, FIELD_H);
-    c.fillRect(FIELD_X + FIELD_W - END_ZONE_W, FIELD_Y, END_ZONE_W, FIELD_H);
-
-    // Sideline border.
-    c.strokeStyle = COLOR_WHITE;
-    c.lineWidth = 4;
-    c.strokeRect(FIELD_X + 2, FIELD_Y + 2, FIELD_W - 4, FIELD_H - 4);
-
-    // Goal lines.
-    c.beginPath();
-    c.moveTo(ydx(0), FIELD_Y);
-    c.lineTo(ydx(0), FIELD_Y + FIELD_H);
-    c.moveTo(ydx(100), FIELD_Y);
-    c.lineTo(ydx(100), FIELD_Y + FIELD_H);
-    c.stroke();
-
-    // Yard lines every 5 yards.
-    c.strokeStyle = COLOR_LINE;
-    c.lineWidth = 2;
-    for (let yards = 5; yards < 100; yards += 5) {
-      const x = ydx(yards);
-      c.beginPath();
-      c.moveTo(x, FIELD_Y);
-      c.lineTo(x, FIELD_Y + FIELD_H);
-      c.stroke();
-    }
-
-    // Yard numbers, near the top and bottom.
-    c.fillStyle = COLOR_WHITE;
-    c.font = 'bold 40px sans-serif';
-    c.textAlign = 'center';
-    c.textBaseline = 'middle';
-    YARD_NUMBERS.forEach((num, i) => {
-      const x = ydx((i + 1) * 10);
-      c.fillText(String(num), x, FIELD_Y + 60);
-      c.fillText(String(num), x, FIELD_Y + FIELD_H - 60);
-    });
-
-    // Hash marks: short ticks every yard at ~34% and ~66% down the field.
-    c.strokeStyle = COLOR_LINE;
-    c.lineWidth = 2;
-    const hashY1 = FIELD_Y + FIELD_H * 0.34;
-    const hashY2 = FIELD_Y + FIELD_H * 0.66;
-    const hashLen = 10;
-    for (let yards = 0; yards <= 100; yards++) {
-      const x = ydx(yards);
-      c.beginPath();
-      c.moveTo(x, hashY1 - hashLen / 2);
-      c.lineTo(x, hashY1 + hashLen / 2);
-      c.moveTo(x, hashY2 - hashLen / 2);
-      c.lineTo(x, hashY2 + hashLen / 2);
-      c.stroke();
-    }
+  function drawJumbotron(){
+    if(!projList.length) return;
+    const feat=active&&active.cat==='proj', proj=(feat?active:projList[Math.floor(t/2.6)%projList.length])||projList[0]; currentJumboProj=proj;
+    const sx=JUMBO.x-cam.x, sy=JUMBO.y-cam.y, w=JUMBO.w, h=JUMBO.h;
+    if(sy+ h<-20||sy>vh+20) return;
+    px(ctx,sx-6,sy-6,w+12,h+16,'#14161d');
+    for(let i=0;i<w;i+=12) px(ctx,sx+i,sy-6,5,5,(Math.floor(t*6)+i)%24<12?'#f2b23e':'#7a5e20');
+    px(ctx,sx,sy,w,h,'#0c1a12');
+    ctx.fillStyle=feat?'#f2b23e':'#3fb6a8'; ctx.fillRect(sx-2,sy-2,w+4,2); ctx.fillRect(sx-2,sy+h,w+4,2); ctx.fillRect(sx-2,sy-2,2,h+4); ctx.fillRect(sx+w,sy-2,2,h+4);
+    ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+    ctx.fillStyle=feat?'#f2b23e':'#8fe6dc'; ctx.font="7px 'Press Start 2P',monospace"; ctx.fillText(feat?'NOW PLAYING':'NOW FEATURING',sx+w/2,sy+18);
+    ctx.fillStyle='#f4efe0'; ctx.font="10px 'Press Start 2P',monospace"; ctx.fillText(proj.plate,sx+w/2,sy+40);
+    if(feat){ ctx.fillStyle='#9fb09c'; ctx.font="7px 'Press Start 2P'"; ctx.fillText((projList.indexOf(proj)+1)+' / '+projList.length,sx+w/2,sy+56); }
+    else if(!reduceMotion && Math.floor(t*2)%2){ ctx.fillStyle='#f2b23e'; ctx.font="7px 'Press Start 2P'"; ctx.fillText('TAP TO GO',sx+w/2,sy+56); }
   }
 
-  // Dense crowd of small pixel blocks, skipping some cells for aisles
-  // and empty seats. Occupied cells are recorded in CROWD_CELLS so a
-  // sparkle effect can flicker a few of them per frame (skipped entirely
-  // under prefers-reduced-motion).
-  const CROWD_CELL_SIZE = 8;
-  let CROWD_CELLS = [];
-
-  function paintCrowd(rect) {
-    const cell = CROWD_CELL_SIZE;
-    const cols = Math.floor(rect.w / cell);
-    const rows = Math.floor(rect.h / cell);
-    for (let row = 0; row < rows; row++) {
-      for (let col = 0; col < cols; col++) {
-        if (col % 9 === 4 || row % 9 === 4) continue; // aisles
-        if (Math.random() < 0.12) continue; // empty seats
-        const x = rect.x + col * cell;
-        const y = rect.y + row * cell;
-        worldCtx.fillStyle = CROWD_PALETTE[Math.floor(Math.random() * CROWD_PALETTE.length)];
-        worldCtx.fillRect(x, y, cell - 1, cell - 1);
-        CROWD_CELLS.push({ x, y });
-      }
-    }
+  function drawMinimap(g){
+    const mw=74,pad=8,mh=mw*W.h/W.w,mx=buf.width-mw-pad,my=pad,sx=mw/W.w,sy=mh/W.h;
+    px(g,mx-3,my-3,mw+6,mh+6,'#22201c'); px(g,mx,my,mw,mh,'#23262f');
+    px(g,mx+FX*sx,my+FY*sy,FW*sx,FH*sy,'#4c9a5d');
+    px(g,mx+FX*sx,my+FY*sy,EZ*sx,FH*sy,'#cf3b3b'); px(g,mx+(FX+FW-EZ)*sx,my+FY*sy,EZ*sx,FH*sy,'#cf3b3b');
+    for(const z of Z){ px(g,mx+z.x*sx-1,my+z.y*sy-1,3,3,C[z.cat]); }
+    g.strokeStyle='rgba(255,255,255,.7)'; g.lineWidth=1; g.strokeRect(mx+cam.x*sx,my+cam.y*sy,Math.min(vw,W.w)*sx,Math.min(vh,W.h)*sy);
+    px(g,mx+P.x*sx-1,my+P.y*sy-1,3,3,'#f4efe0');
   }
 
-  function drawBanner(x, y, w, h, text) {
-    worldCtx.fillStyle = '#12141a';
-    worldCtx.fillRect(x, y, w, h);
-    worldCtx.strokeStyle = COLOR_WHITE;
-    worldCtx.lineWidth = 1;
-    worldCtx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
-    worldCtx.fillStyle = COLOR_WHITE;
-    worldCtx.font = 'bold 14px sans-serif';
-    worldCtx.textAlign = 'center';
-    worldCtx.textBaseline = 'middle';
-    worldCtx.fillText(text, x + w / 2, y + h / 2);
-  }
-
-  function drawBanners() {
-    const bannerW = 340;
-    const bannerH = 22;
-    const cx = WORLD_W / 2;
-    const topY = OUTER_MARGIN + STAND_DEPTH + (APRON - bannerH) / 2;
-    const bottomY = FIELD_Y + FIELD_H + (APRON - bannerH) / 2;
-
-    drawBanner(cx - bannerW / 2, topY, bannerW, bannerH, 'PORTFOLIO-V2');
-    drawBanner(cx - bannerW / 2, bottomY, bannerW, bannerH, 'VICTOROLATUNJI27');
-  }
-
-  function buildWorld() {
-    world = document.createElement('canvas');
-    world.width = WORLD_W;
-    world.height = WORLD_H;
-    worldCtx = world.getContext('2d');
-    worldCtx.imageSmoothingEnabled = false;
-
-    // Dark background.
-    worldCtx.fillStyle = COLOR_BG;
-    worldCtx.fillRect(0, 0, WORLD_W, WORLD_H);
-
-    // Stands and crowd.
-    CROWD_CELLS = [];
-    STANDS.forEach((rect) => {
-      worldCtx.fillStyle = COLOR_STAND;
-      worldCtx.fillRect(rect.x, rect.y, rect.w, rect.h);
-      paintCrowd(rect);
-    });
-
-    // Field, baked on top.
-    drawField(worldCtx);
-
-    // Testudo logo at the exact center of the field.
-    drawLogo(worldCtx, ydx(50), FIELD_Y + FIELD_H / 2);
-
-    // Banners on the inner railings.
-    drawBanners();
-  }
-
-  function resize() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-
-    buf = document.createElement('canvas');
-    buf.width = Math.ceil(window.innerWidth / PXS);
-    buf.height = Math.ceil(window.innerHeight / PXS);
-    bctx = buf.getContext('2d');
-    bctx.imageSmoothingEnabled = false;
-
-    buildWorld();
-  }
-
-  // Player.
-  const PLAYER_W = 24;
-  const PLAYER_H = 32;
-  const WALK_RATE = 6;
-
-  const P = {
-    x: FIELD_X + FIELD_W / 2,
-    y: FIELD_Y + FIELD_H / 2,
-    speed: 320,
-    face: 1,
-    moving: false,
-    animTime: 0,
-  };
-
-  // Camera: world-space top-left corner of the visible viewport.
-  const CAM_EASE_RATE = 6;
-  const cam = { x: 0, y: 0 };
-
-  // Auto-walk target set by clicking the jumbotron; any key press cancels it.
-  const MOVE_ARRIVE_DIST = 6;
-  let moveTarget = null;
-
-  function clamp(v, lo, hi) {
-    return Math.min(Math.max(v, lo), hi);
-  }
-
-  // Held-key tracking for WASD and arrow keys.
-  const keys = {};
-  const TRACKED_KEYS = new Set([
-    'KeyW', 'KeyA', 'KeyS', 'KeyD',
-    'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
-  ]);
-  window.addEventListener('keydown', (e) => {
-    if (TRACKED_KEYS.has(e.code)) {
-      keys[e.code] = true;
-      e.preventDefault();
-    }
-  });
-  window.addEventListener('keyup', (e) => {
-    if (TRACKED_KEYS.has(e.code)) {
-      keys[e.code] = false;
-      e.preventDefault();
-    }
-  });
-
-  // On-screen d-pad: shown only on touch devices, drives the same `keys`
-  // object as the keyboard.
-  const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-  const dpadEl = document.getElementById('dpad');
-  if (isTouchDevice) {
-    dpadEl.classList.add('visible');
-  }
-  dpadEl.querySelectorAll('.dpad-btn').forEach((btn) => {
-    const code = btn.dataset.key;
-    const press = (e) => {
-      e.preventDefault();
-      keys[code] = true;
-      try { btn.setPointerCapture(e.pointerId); } catch (err) { /* not critical */ }
-    };
-    const release = () => {
-      keys[code] = false;
-    };
-    btn.addEventListener('pointerdown', press);
-    btn.addEventListener('pointerup', release);
-    btn.addEventListener('pointercancel', release);
-    btn.addEventListener('pointerleave', release);
-  });
-
-  // "Press Start" intro screen, dismissed on the first input.
-  const introEl = document.getElementById('intro');
-  function dismissIntro() {
-    introEl.classList.add('hidden');
-    window.removeEventListener('keydown', dismissIntro);
-    window.removeEventListener('pointerdown', dismissIntro);
-  }
-  window.addEventListener('keydown', dismissIntro);
-  window.addEventListener('pointerdown', dismissIntro);
-
-  // Web Audio chiptune: square-wave blips, a low thud, and a jingle.
-  let audioCtx = null;
-  let soundEnabled = true;
-
-  function unlockAudio() {
-    if (!audioCtx) {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    } else if (audioCtx.state === 'suspended') {
-      audioCtx.resume();
-    }
-    window.removeEventListener('click', unlockAudio);
-    window.removeEventListener('keydown', unlockAudio);
-  }
-  window.addEventListener('click', unlockAudio);
-  window.addEventListener('keydown', unlockAudio);
-
-  function playTone(freq, duration, type, peakGain, delay) {
-    if (!soundEnabled || !audioCtx) return;
-    const t0 = audioCtx.currentTime + (delay || 0);
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, t0);
-    gain.gain.setValueAtTime(peakGain, t0);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
-    osc.connect(gain).connect(audioCtx.destination);
-    osc.start(t0);
-    osc.stop(t0 + duration + 0.02);
-  }
-
-  function playBlip() {
-    playTone(880, 0.08, 'square', 0.15);
-  }
-
-  function playThud() {
-    playTone(90, 0.18, 'sine', 0.3);
-  }
-
-  function playJingle() {
-    const notes = [523.25, 659.25, 784.0, 1046.5, 1318.5];
-    notes.forEach((freq, i) => playTone(freq, 0.12, 'square', 0.12, i * 0.09));
-  }
-
-  const soundToggleEl = document.getElementById('soundToggle');
-  soundToggleEl.addEventListener('click', () => {
-    soundEnabled = !soundEnabled;
-    soundToggleEl.textContent = 'SOUND: ' + (soundEnabled ? 'ON' : 'OFF');
-  });
-
-  // Proximity detection and the DOM drawer/scoreboard it drives.
-  // `proximityId` is the nearest stop within walking range (drives the
-  // knockdown and arrival sounds). `hoverId` is whatever the mouse is over
-  // (lets a mouse user scout panels without walking). `activeId` is
-  // whichever of the two is currently on screen, hover taking priority.
-  const PROXIMITY_RADIUS = 94;
-  const HOVER_RADIUS = 60;
-  let proximityId = null;
-  let hoverId = null;
-  let activeId = null;
-  let mouseX = null;
-  let mouseY = null;
-
-  const drawerEl = document.getElementById('drawer');
-  const drawerYardEl = document.getElementById('drawerYard');
-  const drawerTitleEl = document.getElementById('drawerTitle');
-  const drawerMetaEl = document.getElementById('drawerMeta');
-  const drawerBodyEl = document.getElementById('drawerBody');
-  const scoreboardEl = document.getElementById('scoreboard');
-
-  function renderBody(body) {
-    if (body.tags) {
-      return '<div class="tags">' + body.tags.map((t) => `<span class="tag">${t}</span>`).join('') + '</div>';
-    }
-    if (body.links) {
-      return '<ul class="links">' + body.links.map((l) => {
-        const attrs = l.download ? `download="${l.download}"` : 'target="_blank" rel="noopener"';
-        return `<li><a href="${l.href}" ${attrs}>${l.label}</a></li>`;
-      }).join('') + '</ul>';
-    }
-    return body.html || '';
-  }
-
-  function findNearest() {
-    let nearest = null;
-    let nearestDist = Infinity;
-    for (const entry of Z) {
-      const dist = Math.hypot(entry.x - P.x, entry.y - P.y);
-      if (dist < nearestDist) {
-        nearestDist = dist;
-        nearest = entry;
-      }
-    }
-    return nearestDist <= PROXIMITY_RADIUS ? nearest : null;
-  }
-
-  // Updates the drawer/scoreboard DOM only — no sound. Sound is triggered
-  // separately, only when the player physically reaches a stop.
-  function renderDrawer(entry) {
-    if (!entry) {
-      drawerEl.classList.remove('open');
-      scoreboardEl.textContent = '—';
-      return;
-    }
-    drawerYardEl.textContent = entry.plate + (entry.yard ? ' · YD ' + entry.yard : '');
-    drawerTitleEl.textContent = entry.title;
-    drawerMetaEl.textContent = entry.meta;
-    drawerBodyEl.innerHTML = renderBody(entry.body);
-    drawerEl.classList.add('open');
-    drawerEl.classList.toggle('about-active', entry.id === 'about');
-    scoreboardEl.textContent = entry.plate + ' — ' + entry.title;
-  }
-
-  canvas.addEventListener('pointermove', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    mouseX = e.clientX - rect.left;
-    mouseY = e.clientY - rect.top;
-  });
-  canvas.addEventListener('pointerleave', () => {
-    mouseX = null;
-    mouseY = null;
-  });
-
-  function computeHoverId() {
-    if (mouseX === null) return null;
-    let best = null;
-    let bestDist = Infinity;
-    for (const entry of Z) {
-      const pos = worldToScreen(entry.x, entry.y);
-      const dist = Math.hypot(pos.x - mouseX, pos.y - mouseY);
-      if (dist < bestDist) {
-        bestDist = dist;
-        best = entry;
-      }
-    }
-    return best && bestDist <= HOVER_RADIUS ? best.id : null;
-  }
-
-  // Draws one sprite centered on the current bctx origin (0, 0): a helmet,
-  // jersey, arms, and legs built from filled rectangles.
-  function drawCharacterBody(face, moving, animTime, colors, opts) {
-    const top = -PLAYER_H / 2;
-
-    const helmetH = 8;
-    const jerseyH = 12;
-    const legsH = PLAYER_H - helmetH - jerseyH;
-    const helmetTop = top;
-    const jerseyTop = top + helmetH;
-    const legsTop = top + helmetH + jerseyH;
-
-    // Soft shadow under the sprite.
-    bctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
-    bctx.fillRect(-9, top + PLAYER_H, 18, 4);
-
-    // Legs: two-frame walk animation, still when not moving.
-    const legW = 6;
-    const legGap = 2;
-    const legsLeft = -(legW * 2 + legGap) / 2;
-    let leadLift = 0;
-    let trailLift = 0;
-    if (moving && !prefersReducedMotion) {
-      const phase = Math.floor(animTime * WALK_RATE) % 2;
-      leadLift = phase === 0 ? 3 : 0;
-      trailLift = phase === 0 ? 0 : 3;
-    }
-    bctx.fillStyle = colors.pants;
-    bctx.fillRect(legsLeft, legsTop + leadLift, legW, legsH - leadLift);
-    bctx.fillRect(legsLeft + legW + legGap, legsTop + trailLift, legW, legsH - trailLift);
-
-    // Arms.
-    const armW = 4;
-    const jerseyW = 14;
-    const jerseyLeft = -jerseyW / 2;
-    bctx.fillStyle = colors.skin;
-    bctx.fillRect(jerseyLeft - armW, jerseyTop + 2, armW, jerseyH - 4);
-    bctx.fillRect(jerseyLeft + jerseyW, jerseyTop + 2, armW, jerseyH - 4);
-
-    // Jersey, with an optional number.
-    bctx.fillStyle = colors.jersey;
-    bctx.fillRect(jerseyLeft, jerseyTop, jerseyW, jerseyH);
-    if (opts.number) {
-      bctx.fillStyle = colors.jerseyText || COLOR_WHITE;
-      bctx.font = 'bold 6px sans-serif';
-      bctx.textAlign = 'center';
-      bctx.textBaseline = 'middle';
-      bctx.fillText(opts.number, 0, jerseyTop + jerseyH / 2 + 1);
-    }
-
-    // Football tucked under the front arm, on the facing side.
-    if (opts.ball) {
-      const ballSize = 4;
-      const ballY = jerseyTop + jerseyH - ballSize - 1;
-      const ballX = face === 1 ? jerseyLeft + jerseyW - 2 : jerseyLeft - ballSize + 2;
-      bctx.fillStyle = COLOR_BALL;
-      bctx.fillRect(ballX, ballY, ballSize, ballSize);
-    }
-
-    // Helmet with a stripe and face.
-    const helmetW = 12;
-    const helmetLeft = -helmetW / 2;
-    bctx.fillStyle = colors.helmet;
-    bctx.fillRect(helmetLeft, helmetTop, helmetW, helmetH);
-    bctx.fillStyle = colors.stripe;
-    bctx.fillRect(helmetLeft, helmetTop + helmetH / 2 - 1, helmetW, 2);
-
-    const faceW = 5;
-    const faceX = face === 1 ? helmetLeft + helmetW - faceW : helmetLeft;
-    bctx.fillStyle = colors.skin;
-    bctx.fillRect(faceX, helmetTop + 2, faceW, helmetH - 3);
-
-    // Facemask, on the facing side.
-    const maskW = 2;
-    const maskX = face === 1 ? helmetLeft + helmetW : helmetLeft - maskW;
-    bctx.fillStyle = colors.mask;
-    bctx.fillRect(maskX, helmetTop + 3, maskW, helmetH - 4);
-  }
-
-  function drawPlayer() {
-    bctx.save();
-    bctx.translate(P.x, P.y);
-    drawCharacterBody(P.face, P.moving, P.animTime, PLAYER_COLORS, { ball: true, number: '29' });
-    bctx.restore();
-  }
-
-  // Knockdown tuning: how fast knock ramps up/decays, how far a defender is
-  // pushed away, how high it hops, and how far it rotates as knock goes 0..1.
-  const KNOCK_RAMP_RATE = 1 / 0.5;
-  const KNOCK_DECAY_RATE = 1 / 0.9;
-  const KNOCK_PUSH_DIST = 14;
-  const KNOCK_HOP_HEIGHT = 10;
-  const KNOCK_ROTATION = 1.3;
-  const POW_MIN = 0.2;
-  const POW_MAX = 0.85;
-
-  function drawDefender(entry) {
-    const knock = entry.knock;
-    const awayX = entry.x - P.x;
-    const awayY = entry.y - P.y;
-    const awayLen = Math.hypot(awayX, awayY) || 1;
-    const pushDist = knock * KNOCK_PUSH_DIST;
-    const px = entry.x + (awayX / awayLen) * pushDist;
-    const py = entry.y + (awayY / awayLen) * pushDist;
-    const hop = Math.sin(knock * Math.PI) * KNOCK_HOP_HEIGHT;
-    const face = P.x >= entry.x ? 1 : -1;
-    const rotation = -face * knock * KNOCK_ROTATION;
-
-    bctx.save();
-    bctx.translate(px, py - hop);
-    bctx.rotate(rotation);
-    drawCharacterBody(face, false, 0, DEFENDER_COLORS, {});
-    bctx.restore();
-  }
-
-  // Crisp name-plate overlay, drawn on the main (full-resolution) canvas —
-  // not the low-res pixel buffer — so the text stays sharp.
-  const PLATE_FONT = "8px 'Press Start 2P', monospace";
-
-  function worldToScreen(x, y) {
-    return { x: (x - cam.x) * PXS, y: (y - cam.y) * PXS };
-  }
-
-  function drawPlate(entry) {
-    const isActive = entry.id === activeId;
-    const pos = worldToScreen(entry.x, entry.y - (PLAYER_H / 2 + 14));
-    if (pos.x < -100 || pos.x > canvas.width + 100 || pos.y < -40 || pos.y > canvas.height + 40) return;
-
-    const label = entry.yard === 'EZ' ? entry.plate : entry.plate + ' ' + entry.yard;
-    ctx.font = PLATE_FONT;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    const textW = ctx.measureText(label).width;
-    const boxW = textW + 16;
-    const boxH = 18;
-    const sx = Math.round(pos.x);
-    const sy = Math.round(pos.y);
-
-    ctx.fillStyle = isActive ? 'rgba(20, 22, 29, 0.85)' : 'rgba(20, 22, 29, 0.55)';
-    ctx.fillRect(sx - boxW / 2, sy - boxH / 2, boxW, boxH);
-    ctx.strokeStyle = isActive ? (CATEGORY_COLORS[entry.category] || '#f2c744') : 'rgba(201, 197, 186, 0.4)';
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(sx - boxW / 2 + 0.5, sy - boxH / 2 + 0.5, boxW - 1, boxH - 1);
-
-    ctx.fillStyle = isActive ? '#ffffff' : 'rgba(232, 228, 210, 0.7)';
-    ctx.fillText(label, sx, sy + 1);
-  }
-
-  function drawPow(entry) {
-    if (entry.knock <= POW_MIN || entry.knock >= POW_MAX) return;
-    const pos = worldToScreen(entry.x, entry.y - (PLAYER_H / 2 + 34));
-
-    ctx.save();
-    ctx.translate(Math.round(pos.x), Math.round(pos.y));
-    ctx.rotate(-0.15);
-    ctx.font = "16px 'Press Start 2P', monospace";
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.strokeStyle = '#1a1714';
-    ctx.lineWidth = 3;
-    ctx.strokeText('POW!', 0, 0);
-    ctx.fillStyle = '#f2c744';
-    ctx.fillText('POW!', 0, 0);
-    ctx.restore();
-  }
-
-  // Jumbotron: mounted over the top stands, drawn on the crisp overlay.
-  // Cycles through project entries when idle, locks to whichever project
-  // the player is standing on, and is clickable to auto-walk there.
-  const PROJECT_ENTRIES = Z.filter((entry) => entry.category === 'project');
-  const JUMBOTRON_CYCLE_INTERVAL = 3;
-  const JUMBOTRON_W = 240;
-  const JUMBOTRON_H = 70;
-  const JUMBOTRON_POS = { x: WORLD_W / 2, y: OUTER_MARGIN + STAND_DEPTH * 0.3 };
-
-  let jumbotronCycleIndex = 0;
-  let jumbotronCycleTimer = 0;
-  let jumbotronLocked = false;
-  let jumbotronFeatured = PROJECT_ENTRIES[0];
-
-  function getJumbotronScreenBox() {
-    const topLeft = worldToScreen(JUMBOTRON_POS.x - JUMBOTRON_W / 2, JUMBOTRON_POS.y - JUMBOTRON_H / 2);
-    return { x: topLeft.x, y: topLeft.y, w: JUMBOTRON_W * PXS, h: JUMBOTRON_H * PXS };
-  }
-
-  function drawJumbotron() {
-    const box = getJumbotronScreenBox();
-    if (box.x + box.w < -50 || box.x > canvas.width + 50 || box.y + box.h < -50 || box.y > canvas.height + 50) return;
-
-    ctx.fillStyle = 'rgba(10, 11, 15, 0.9)';
-    ctx.fillRect(box.x, box.y, box.w, box.h);
-    ctx.strokeStyle = '#3a3d47';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(box.x + 1, box.y + 1, box.w - 2, box.h - 2);
-
-    const pad = 10;
-    ctx.fillStyle = '#05070a';
-    ctx.fillRect(box.x + pad, box.y + pad, box.w - pad * 2, box.h - pad * 2);
-
-    const cx = box.x + box.w / 2;
-    const cy = box.y + box.h / 2;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    ctx.fillStyle = '#f2c744';
-    ctx.font = "10px 'Press Start 2P', monospace";
-    const title = jumbotronFeatured ? jumbotronFeatured.title.toUpperCase() : 'PROJECTS';
-    ctx.fillText(title, cx, cy - 10);
-
-    ctx.font = "20px 'VT323', monospace";
-    if (jumbotronLocked) {
-      ctx.fillStyle = '#e8e4d2';
-      ctx.fillText('FEATURED', cx, cy + 14);
-    } else if (prefersReducedMotion || Math.floor(performance.now() / 500) % 2 === 0) {
-      ctx.fillStyle = '#e8e4d2';
-      ctx.fillText('TAP TO GO', cx, cy + 14);
-    }
-  }
-
-  canvas.addEventListener('pointerdown', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const px = e.clientX - rect.left;
-    const py = e.clientY - rect.top;
-    const box = getJumbotronScreenBox();
-    if (jumbotronFeatured && px >= box.x && px <= box.x + box.w && py >= box.y && py <= box.y + box.h) {
-      moveTarget = { x: jumbotronFeatured.x, y: jumbotronFeatured.y };
-    }
-  });
-
-  function drawOverlay() {
-    Z.forEach(drawPlate);
-    Z.forEach(drawPow);
-    drawJumbotron();
-  }
-
-  function update(dt) {
-    let dx = 0;
-    let dy = 0;
-    if (keys.KeyA || keys.ArrowLeft) dx -= 1;
-    if (keys.KeyD || keys.ArrowRight) dx += 1;
-    if (keys.KeyW || keys.ArrowUp) dy -= 1;
-    if (keys.KeyS || keys.ArrowDown) dy += 1;
-
-    const keyHeld = dx !== 0 || dy !== 0;
-    if (keyHeld) {
-      moveTarget = null;
-    } else if (moveTarget) {
-      const tdx = moveTarget.x - P.x;
-      const tdy = moveTarget.y - P.y;
-      const dist = Math.hypot(tdx, tdy);
-      if (dist <= MOVE_ARRIVE_DIST) {
-        moveTarget = null;
-      } else {
-        dx = tdx / dist;
-        dy = tdy / dist;
-      }
-    }
-
-    if (dx !== 0 || dy !== 0) {
-      const len = Math.hypot(dx, dy);
-      dx /= len;
-      dy /= len;
-    }
-
-    P.x += dx * P.speed * dt;
-    P.y += dy * P.speed * dt;
-
-    if (dx > 0) P.face = 1;
-    else if (dx < 0) P.face = -1;
-
-    P.moving = dx !== 0 || dy !== 0;
-    P.animTime = P.moving ? P.animTime + dt : 0;
-
-    P.x = clamp(P.x, FIELD_X + PLAYER_W / 2, FIELD_X + FIELD_W - PLAYER_W / 2);
-    P.y = clamp(P.y, FIELD_Y + PLAYER_H / 2, FIELD_Y + FIELD_H - PLAYER_H / 2);
-
-    // Ease the camera toward centering on the player (snap instantly under
-    // prefers-reduced-motion).
-    const targetX = P.x - buf.width / 2;
-    const targetY = P.y - buf.height / 2;
-    if (prefersReducedMotion) {
-      cam.x = targetX;
-      cam.y = targetY;
-    } else {
-      const ease = 1 - Math.exp(-CAM_EASE_RATE * dt);
-      cam.x += (targetX - cam.x) * ease;
-      cam.y += (targetY - cam.y) * ease;
-    }
-
-    // Clamp so the camera never shows past the world edges.
-    cam.x = buf.width >= WORLD_W
-      ? (WORLD_W - buf.width) / 2
-      : clamp(cam.x, 0, WORLD_W - buf.width);
-    cam.y = buf.height >= WORLD_H
-      ? (WORLD_H - buf.height) / 2
-      : clamp(cam.y, 0, WORLD_H - buf.height);
-
-    // Proximity detection drives the knockdown and arrival sounds.
-    const nearest = findNearest();
-    const newProximityId = nearest ? nearest.id : null;
-    if (newProximityId !== proximityId) {
-      proximityId = newProximityId;
-      if (nearest) {
-        playBlip();
-        if (nearest.category === 'project' || nearest.category === 'contact') {
-          playJingle();
-        }
-      }
-    }
-
-    // Hovering a marker also opens its panel — hover wins over proximity
-    // for what's shown, so a mouse user can scout without walking.
-    hoverId = computeHoverId();
-    const displayId = hoverId !== null ? hoverId : proximityId;
-    if (displayId !== activeId) {
-      activeId = displayId;
-      renderDrawer(Z.find((entry) => entry.id === activeId) || null);
-    }
-
-    // Knockdown: ramp the defender the player is physically near toward 1,
-    // decay the rest.
-    Z.forEach((entry) => {
-      const target = entry.id === proximityId ? 1 : 0;
-      const rate = target === 1 ? KNOCK_RAMP_RATE : KNOCK_DECAY_RATE;
-      if (entry.knock < target) {
-        entry.knock = Math.min(target, entry.knock + rate * dt);
-      } else if (entry.knock > target) {
-        entry.knock = Math.max(target, entry.knock - rate * dt);
-      }
-
-      if (entry.knock >= 0.999 && !entry._knockedDown) {
-        entry._knockedDown = true;
-        playThud();
-      } else if (entry.knock < 0.05) {
-        entry._knockedDown = false;
-      }
-    });
-
-    // Jumbotron: lock to whatever project the player is standing on;
-    // otherwise cycle through the projects on a timer.
-    const proximityEntry = Z.find((entry) => entry.id === proximityId) || null;
-    if (proximityEntry && proximityEntry.category === 'project') {
-      jumbotronLocked = true;
-      jumbotronFeatured = proximityEntry;
-      jumbotronCycleTimer = 0;
-    } else {
-      jumbotronLocked = false;
-      jumbotronCycleTimer += dt;
-      if (jumbotronCycleTimer >= JUMBOTRON_CYCLE_INTERVAL) {
-        jumbotronCycleTimer = 0;
-        jumbotronCycleIndex = (jumbotronCycleIndex + 1) % PROJECT_ENTRIES.length;
-      }
-      jumbotronFeatured = PROJECT_ENTRIES[jumbotronCycleIndex];
-    }
-  }
-
-  // Flickers a handful of crowd cells per frame; skipped entirely under
-  // prefers-reduced-motion.
-  const CROWD_SPARKLE_COUNT = 8;
-  function drawCrowdSparkle() {
-    if (prefersReducedMotion || CROWD_CELLS.length === 0) return;
-    bctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-    for (let i = 0; i < CROWD_SPARKLE_COUNT; i++) {
-      const cell = CROWD_CELLS[(Math.random() * CROWD_CELLS.length) | 0];
-      bctx.fillRect(cell.x, cell.y, CROWD_CELL_SIZE - 1, CROWD_CELL_SIZE - 1);
-    }
-  }
-
-  function render(dt) {
-    bctx.fillStyle = COLOR_BG;
-    bctx.fillRect(0, 0, buf.width, buf.height);
-
-    bctx.save();
-    bctx.translate(-cam.x, -cam.y);
-    bctx.drawImage(world, 0, 0);
-    drawCrowdSparkle();
-    Z.forEach(drawDefender);
-    drawPlayer();
-    bctx.restore();
-
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(buf, 0, 0, buf.width * PXS, buf.height * PXS);
-
-    drawOverlay();
-  }
-
-  window.addEventListener('resize', resize);
-  resize();
-
-  let lastTime = performance.now();
-  let loggedLoopError = false;
-  function loop(now) {
-    const dt = Math.min((now - lastTime) / 1000, 0.05);
-    lastTime = now;
-    try {
-      update(dt);
-      render(dt);
-    } catch (err) {
-      if (!loggedLoopError) {
-        loggedLoopError = true;
-        console.error('Game loop error:', err);
-      }
-    }
-    requestAnimationFrame(loop);
-  }
-  requestAnimationFrame(loop);
+  cam.x=Math.max(0,Math.min(W.w-vw,P.x-vw/2)); cam.y=Math.max(0,Math.min(W.h-vh,P.y-vh/2));
+  requestAnimationFrame(frame);
+})();
 </script>
 </body>
 </html>
