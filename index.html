@@ -135,6 +135,43 @@
     transform: translate(3px, 3px);
   }
 
+  /* On-screen d-pad: JS reveals it only on touch devices. */
+  #dpad {
+    display: none;
+    position: fixed;
+    bottom: 24px;
+    left: 24px;
+    grid-template-columns: repeat(3, 52px);
+    grid-template-rows: repeat(3, 52px);
+    grid-template-areas: ". up ." "left . right" ". down .";
+    gap: 4px;
+    z-index: 20;
+  }
+  #dpad.visible {
+    display: grid;
+  }
+  .dpad-btn {
+    background: #e8e4d2;
+    color: #1a1714;
+    border: 3px solid #1a1714;
+    box-shadow: 3px 3px 0 #1a1714;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .dpad-btn:active {
+    box-shadow: 1px 1px 0 #1a1714;
+    transform: translate(2px, 2px);
+  }
+  .dpad-up { grid-area: up; }
+  .dpad-down { grid-area: down; }
+  .dpad-left { grid-area: left; }
+  .dpad-right { grid-area: right; }
+
   /* Full-screen CRT scanlines + vignette. */
   #crtOverlay {
     position: fixed;
@@ -179,6 +216,11 @@
   }
   @keyframes intro-blink {
     50% { opacity: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .intro-card .blink {
+      animation: none;
+    }
   }
 
   /* About stop: pixel helmet + stat-bar trading card. */
@@ -235,6 +277,12 @@
   <div class="drawer-meta" id="drawerMeta"></div>
   <div class="drawer-body" id="drawerBody"></div>
 </aside>
+<div id="dpad">
+  <button class="dpad-btn dpad-up" data-key="ArrowUp" aria-label="Up" type="button">&#9650;</button>
+  <button class="dpad-btn dpad-left" data-key="ArrowLeft" aria-label="Left" type="button">&#9664;</button>
+  <button class="dpad-btn dpad-right" data-key="ArrowRight" aria-label="Right" type="button">&#9654;</button>
+  <button class="dpad-btn dpad-down" data-key="ArrowDown" aria-label="Down" type="button">&#9660;</button>
+</div>
 <div id="crtOverlay"></div>
 <div id="intro">
   <div class="intro-card">
@@ -245,6 +293,9 @@
 <script>
   const canvas = document.getElementById('field');
   const ctx = canvas.getContext('2d');
+
+  // When set, skip camera easing, leg animation, crowd sparkle, and blinking.
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // Low-resolution offscreen buffer for a pixel-art look.
   const PXS = 3;
@@ -554,17 +605,25 @@
   }
 
   // Dense crowd of small pixel blocks, skipping some cells for aisles
-  // and empty seats.
+  // and empty seats. Occupied cells are recorded in CROWD_CELLS so a
+  // sparkle effect can flicker a few of them per frame (skipped entirely
+  // under prefers-reduced-motion).
+  const CROWD_CELL_SIZE = 8;
+  let CROWD_CELLS = [];
+
   function paintCrowd(rect) {
-    const cell = 8;
+    const cell = CROWD_CELL_SIZE;
     const cols = Math.floor(rect.w / cell);
     const rows = Math.floor(rect.h / cell);
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < cols; col++) {
         if (col % 9 === 4 || row % 9 === 4) continue; // aisles
         if (Math.random() < 0.12) continue; // empty seats
+        const x = rect.x + col * cell;
+        const y = rect.y + row * cell;
         worldCtx.fillStyle = CROWD_PALETTE[Math.floor(Math.random() * CROWD_PALETTE.length)];
-        worldCtx.fillRect(rect.x + col * cell, rect.y + row * cell, cell - 1, cell - 1);
+        worldCtx.fillRect(x, y, cell - 1, cell - 1);
+        CROWD_CELLS.push({ x, y });
       }
     }
   }
@@ -605,6 +664,7 @@
     worldCtx.fillRect(0, 0, WORLD_W, WORLD_H);
 
     // Stands and crowd.
+    CROWD_CELLS = [];
     STANDS.forEach((rect) => {
       worldCtx.fillStyle = COLOR_STAND;
       worldCtx.fillRect(rect.x, rect.y, rect.w, rect.h);
@@ -677,6 +737,29 @@
       keys[e.code] = false;
       e.preventDefault();
     }
+  });
+
+  // On-screen d-pad: shown only on touch devices, drives the same `keys`
+  // object as the keyboard.
+  const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  const dpadEl = document.getElementById('dpad');
+  if (isTouchDevice) {
+    dpadEl.classList.add('visible');
+  }
+  dpadEl.querySelectorAll('.dpad-btn').forEach((btn) => {
+    const code = btn.dataset.key;
+    const press = (e) => {
+      e.preventDefault();
+      keys[code] = true;
+      try { btn.setPointerCapture(e.pointerId); } catch (err) { /* not critical */ }
+    };
+    const release = () => {
+      keys[code] = false;
+    };
+    btn.addEventListener('pointerdown', press);
+    btn.addEventListener('pointerup', release);
+    btn.addEventListener('pointercancel', release);
+    btn.addEventListener('pointerleave', release);
   });
 
   // "Press Start" intro screen, dismissed on the first input.
@@ -848,7 +931,7 @@
     const legsLeft = -(legW * 2 + legGap) / 2;
     let leadLift = 0;
     let trailLift = 0;
-    if (moving) {
+    if (moving && !prefersReducedMotion) {
       const phase = Math.floor(animTime * WALK_RATE) % 2;
       leadLift = phase === 0 ? 3 : 0;
       trailLift = phase === 0 ? 0 : 3;
@@ -1039,7 +1122,7 @@
     if (jumbotronLocked) {
       ctx.fillStyle = '#e8e4d2';
       ctx.fillText('FEATURED', cx, cy + 14);
-    } else if (Math.floor(performance.now() / 500) % 2 === 0) {
+    } else if (prefersReducedMotion || Math.floor(performance.now() / 500) % 2 === 0) {
       ctx.fillStyle = '#e8e4d2';
       ctx.fillText('TAP TO GO', cx, cy + 14);
     }
@@ -1102,12 +1185,18 @@
     P.x = clamp(P.x, FIELD_X + PLAYER_W / 2, FIELD_X + FIELD_W - PLAYER_W / 2);
     P.y = clamp(P.y, FIELD_Y + PLAYER_H / 2, FIELD_Y + FIELD_H - PLAYER_H / 2);
 
-    // Ease the camera toward centering on the player.
+    // Ease the camera toward centering on the player (snap instantly under
+    // prefers-reduced-motion).
     const targetX = P.x - buf.width / 2;
     const targetY = P.y - buf.height / 2;
-    const ease = 1 - Math.exp(-CAM_EASE_RATE * dt);
-    cam.x += (targetX - cam.x) * ease;
-    cam.y += (targetY - cam.y) * ease;
+    if (prefersReducedMotion) {
+      cam.x = targetX;
+      cam.y = targetY;
+    } else {
+      const ease = 1 - Math.exp(-CAM_EASE_RATE * dt);
+      cam.x += (targetX - cam.x) * ease;
+      cam.y += (targetY - cam.y) * ease;
+    }
 
     // Clamp so the camera never shows past the world edges.
     cam.x = buf.width >= WORLD_W
@@ -1176,6 +1265,18 @@
     }
   }
 
+  // Flickers a handful of crowd cells per frame; skipped entirely under
+  // prefers-reduced-motion.
+  const CROWD_SPARKLE_COUNT = 8;
+  function drawCrowdSparkle() {
+    if (prefersReducedMotion || CROWD_CELLS.length === 0) return;
+    bctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    for (let i = 0; i < CROWD_SPARKLE_COUNT; i++) {
+      const cell = CROWD_CELLS[(Math.random() * CROWD_CELLS.length) | 0];
+      bctx.fillRect(cell.x, cell.y, CROWD_CELL_SIZE - 1, CROWD_CELL_SIZE - 1);
+    }
+  }
+
   function render(dt) {
     bctx.fillStyle = COLOR_BG;
     bctx.fillRect(0, 0, buf.width, buf.height);
@@ -1183,6 +1284,7 @@
     bctx.save();
     bctx.translate(-cam.x, -cam.y);
     bctx.drawImage(world, 0, 0);
+    drawCrowdSparkle();
     Z.forEach(drawDefender);
     drawPlayer();
     bctx.restore();
@@ -1197,11 +1299,19 @@
   resize();
 
   let lastTime = performance.now();
+  let loggedLoopError = false;
   function loop(now) {
     const dt = Math.min((now - lastTime) / 1000, 0.05);
     lastTime = now;
-    update(dt);
-    render(dt);
+    try {
+      update(dt);
+      render(dt);
+    } catch (err) {
+      if (!loggedLoopError) {
+        loggedLoopError = true;
+        console.error('Game loop error:', err);
+      }
+    }
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
