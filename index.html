@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <title>Field</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
 <style>
   html, body {
     margin: 0;
@@ -14,18 +17,23 @@
     image-rendering: pixelated;
   }
 
+  /* Retro cream-card look: 3px dark border, hard offset shadow, no blur. */
+  #scoreboard, #drawer, #soundToggle, .intro-card {
+    background: #e8e4d2;
+    color: #1a1714;
+    border: 3px solid #1a1714;
+    box-shadow: 6px 6px 0 #1a1714;
+  }
+
   #scoreboard {
     position: fixed;
     top: 12px;
     left: 12px;
-    padding: 8px 14px;
-    background: rgba(20, 22, 29, 0.75);
-    color: #e8e4d2;
-    font-family: 'Courier New', monospace;
-    font-size: 14px;
-    letter-spacing: 0.05em;
-    border: 1px solid #3a3d47;
-    border-radius: 4px;
+    padding: 10px 14px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px;
+    letter-spacing: 0.03em;
+    line-height: 1.6;
     z-index: 10;
   }
 
@@ -38,37 +46,44 @@
     height: 100%;
     box-sizing: border-box;
     padding: 28px 24px;
-    background: rgba(18, 20, 26, 0.94);
-    color: #e8e4d2;
-    font-family: system-ui, sans-serif;
-    border-left: 1px solid #3a3d47;
+    font-family: 'VT323', monospace;
+    border-top: none;
+    border-bottom: none;
+    border-right: none;
+    box-shadow: -6px 0 0 #1a1714;
     transform: translateX(100%);
-    transition: transform 0.25s ease;
+    transition: transform 0.25s ease, background 0.2s ease;
     overflow-y: auto;
     z-index: 10;
   }
   #drawer.open {
     transform: translateX(0);
   }
+  #drawer.about-active {
+    background: linear-gradient(160deg, #cf3b3b 0%, #f2c744 100%);
+    color: #1a1714;
+  }
   #drawer .drawer-yard {
-    font-family: 'Courier New', monospace;
-    font-size: 12px;
-    letter-spacing: 0.1em;
-    color: #d4af37;
-    margin-bottom: 6px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    color: #8a5a1a;
+    margin-bottom: 10px;
   }
   #drawer h2 {
-    margin: 0 0 4px;
-    font-size: 22px;
+    font-family: 'Press Start 2P', monospace;
+    margin: 0 0 10px;
+    font-size: 16px;
+    line-height: 1.5;
   }
   #drawer .drawer-meta {
-    font-size: 13px;
-    color: #a9a49a;
+    font-size: 18px;
+    color: #3a352d;
     margin-bottom: 16px;
   }
   #drawer .drawer-body {
-    font-size: 14px;
-    line-height: 1.5;
+    font-size: 20px;
+    line-height: 1.35;
   }
   #drawer .tags {
     display: flex;
@@ -76,11 +91,13 @@
     gap: 6px;
   }
   #drawer .tag {
-    padding: 4px 10px;
-    background: #23262f;
-    border: 1px solid #3a3d47;
-    border-radius: 999px;
-    font-size: 12px;
+    padding: 3px 10px;
+    background: #1a1714;
+    color: #e8e4d2;
+    border: 2px solid #1a1714;
+    border-radius: 0;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px;
   }
   #drawer .links {
     list-style: none;
@@ -88,30 +105,123 @@
     padding: 0;
   }
   #drawer .links li + li {
-    margin-top: 8px;
+    margin-top: 10px;
   }
   #drawer .links a {
+    display: inline-block;
+    color: #1a1714;
+    font-size: 20px;
+    text-decoration: none;
+    border-bottom: 2px solid #1a1714;
+  }
+  #drawer .links a:hover {
+    background: #1a1714;
     color: #e8e4d2;
-    text-decoration: underline;
   }
 
   #soundToggle {
     position: fixed;
     top: 54px;
     left: 12px;
-    padding: 6px 14px;
-    background: rgba(20, 22, 29, 0.75);
-    color: #e8e4d2;
-    font-family: 'Courier New', monospace;
-    font-size: 12px;
-    letter-spacing: 0.05em;
-    border: 1px solid #3a3d47;
-    border-radius: 4px;
+    padding: 8px 14px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px;
+    letter-spacing: 0.03em;
     cursor: pointer;
     z-index: 10;
   }
-  #soundToggle:hover {
-    background: rgba(35, 38, 47, 0.9);
+  #soundToggle:active {
+    box-shadow: 3px 3px 0 #1a1714;
+    transform: translate(3px, 3px);
+  }
+
+  /* Full-screen CRT scanlines + vignette. */
+  #crtOverlay {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 6;
+    background:
+      repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.14) 0px, rgba(0, 0, 0, 0.14) 1px, transparent 1px, transparent 3px),
+      radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 45%, rgba(0, 0, 0, 0.55) 100%);
+  }
+
+  /* "Press Start" intro screen. */
+  #intro {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(10, 11, 15, 0.94);
+    transition: opacity 0.4s ease;
+  }
+  #intro.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .intro-card {
+    padding: 36px 44px;
+    text-align: center;
+    font-family: 'Press Start 2P', monospace;
+  }
+  .intro-card h1 {
+    margin: 0 0 20px;
+    font-size: 18px;
+    line-height: 1.6;
+    color: #cf3b3b;
+  }
+  .intro-card .blink {
+    font-size: 13px;
+    color: #1a1714;
+    animation: intro-blink 1s steps(1) infinite;
+  }
+  @keyframes intro-blink {
+    50% { opacity: 0; }
+  }
+
+  /* About stop: pixel helmet + stat-bar trading card. */
+  .stat-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  .stat-card .pixel-helmet {
+    width: 64px;
+    height: 64px;
+    image-rendering: pixelated;
+    margin-bottom: 10px;
+  }
+  .stat-card .stat-name {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 12px;
+    margin-bottom: 6px;
+  }
+  .stat-card .stat-school {
+    font-size: 18px;
+    margin-bottom: 16px;
+  }
+  .stat-card .stat-bar {
+    display: grid;
+    grid-template-columns: 70px 1fr;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    margin-bottom: 8px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px;
+    text-align: left;
+  }
+  .stat-card .bar {
+    height: 12px;
+    background: #1a1714;
+    border: 2px solid #1a1714;
+  }
+  .stat-card .bar .fill {
+    height: 100%;
+    background: #f2c744;
   }
 </style>
 </head>
@@ -125,6 +235,13 @@
   <div class="drawer-meta" id="drawerMeta"></div>
   <div class="drawer-body" id="drawerBody"></div>
 </aside>
+<div id="crtOverlay"></div>
+<div id="intro">
+  <div class="intro-card">
+    <h1>PORTFOLIO-V2</h1>
+    <div class="blink">PRESS START</div>
+  </div>
+</div>
 <script>
   const canvas = document.getElementById('field');
   const ctx = canvas.getContext('2d');
@@ -212,7 +329,25 @@
       yard: 'EZ', plate: 'ABOUT',
       title: 'Victor Olatunji',
       meta: 'Computer Science · University of Maryland',
-      body: { html: '<p>I build small, fast, playful things for the web — this stadium included. I like JavaScript, canvas rendering, and turning plain data into interfaces that feel alive.</p>' },
+      body: {
+        html: `
+          <div class="stat-card">
+            <svg class="pixel-helmet" viewBox="0 0 16 16" shape-rendering="crispEdges">
+              <rect x="3" y="1" width="10" height="1" fill="#1a1714"/>
+              <rect x="4" y="2" width="8" height="8" fill="#cf3b3b"/>
+              <rect x="4" y="6" width="8" height="2" fill="#e8e4d2"/>
+              <rect x="10" y="4" width="3" height="4" fill="#8a8a8a"/>
+              <rect x="3" y="10" width="10" height="1" fill="#1a1714"/>
+            </svg>
+            <div class="stat-name">VICTOR OLATUNJI</div>
+            <div class="stat-school">University of Maryland &middot; B.S. Computer Science</div>
+            <div class="stat-bar"><span>HUSTLE</span><div class="bar"><div class="fill" style="width:90%"></div></div></div>
+            <div class="stat-bar"><span>CODE</span><div class="bar"><div class="fill" style="width:88%"></div></div></div>
+            <div class="stat-bar"><span>DESIGN</span><div class="bar"><div class="fill" style="width:74%"></div></div></div>
+            <div class="stat-bar"><span>COFFEE</span><div class="bar"><div class="fill" style="width:99%"></div></div></div>
+          </div>
+        `,
+      },
     },
     {
       id: 'skill-frontend', category: 'skills',
@@ -295,7 +430,10 @@
       body: {
         links: [
           { label: 'Email', href: 'mailto:volatunj@terpmail.umd.edu' },
+          { label: 'LinkedIn', href: 'https://www.linkedin.com/in/victor-olatunji-914320345/' },
           { label: 'GitHub', href: 'https://github.com/victorolatunji27' },
+          { label: 'TikTok', href: 'https://www.tiktok.com/@vichackinn' },
+          { label: 'Download Resume (PDF)', href: 'resume.pdf', download: 'Victor Olatunji Resume.pdf' },
         ],
       },
     },
@@ -541,6 +679,16 @@
     }
   });
 
+  // "Press Start" intro screen, dismissed on the first input.
+  const introEl = document.getElementById('intro');
+  function dismissIntro() {
+    introEl.classList.add('hidden');
+    window.removeEventListener('keydown', dismissIntro);
+    window.removeEventListener('pointerdown', dismissIntro);
+  }
+  window.addEventListener('keydown', dismissIntro);
+  window.addEventListener('pointerdown', dismissIntro);
+
   // Web Audio chiptune: square-wave blips, a low thud, and a jingle.
   let audioCtx = null;
   let soundEnabled = true;
@@ -615,7 +763,10 @@
       return '<div class="tags">' + body.tags.map((t) => `<span class="tag">${t}</span>`).join('') + '</div>';
     }
     if (body.links) {
-      return '<ul class="links">' + body.links.map((l) => `<li><a href="${l.href}" target="_blank" rel="noopener">${l.label}</a></li>`).join('') + '</ul>';
+      return '<ul class="links">' + body.links.map((l) => {
+        const attrs = l.download ? `download="${l.download}"` : 'target="_blank" rel="noopener"';
+        return `<li><a href="${l.href}" ${attrs}>${l.label}</a></li>`;
+      }).join('') + '</ul>';
     }
     return body.html || '';
   }
@@ -646,6 +797,7 @@
     drawerMetaEl.textContent = entry.meta;
     drawerBodyEl.innerHTML = renderBody(entry.body);
     drawerEl.classList.add('open');
+    drawerEl.classList.toggle('about-active', entry.id === 'about');
     scoreboardEl.textContent = entry.plate + ' — ' + entry.title;
   }
 
@@ -791,7 +943,7 @@
 
   // Crisp name-plate overlay, drawn on the main (full-resolution) canvas —
   // not the low-res pixel buffer — so the text stays sharp.
-  const PLATE_FONT = "bold 13px 'Courier New', monospace";
+  const PLATE_FONT = "8px 'Press Start 2P', monospace";
 
   function worldToScreen(x, y) {
     return { x: (x - cam.x) * PXS, y: (y - cam.y) * PXS };
@@ -829,7 +981,7 @@
     ctx.save();
     ctx.translate(Math.round(pos.x), Math.round(pos.y));
     ctx.rotate(-0.15);
-    ctx.font = "bold 20px 'Courier New', monospace";
+    ctx.font = "16px 'Press Start 2P', monospace";
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.strokeStyle = '#1a1714';
@@ -879,11 +1031,11 @@
     ctx.textBaseline = 'middle';
 
     ctx.fillStyle = '#f2c744';
-    ctx.font = "bold 16px 'Courier New', monospace";
+    ctx.font = "10px 'Press Start 2P', monospace";
     const title = jumbotronFeatured ? jumbotronFeatured.title.toUpperCase() : 'PROJECTS';
     ctx.fillText(title, cx, cy - 10);
 
-    ctx.font = "12px 'Courier New', monospace";
+    ctx.font = "20px 'VT323', monospace";
     if (jumbotronLocked) {
       ctx.fillStyle = '#e8e4d2';
       ctx.fillText('FEATURED', cx, cy + 14);
