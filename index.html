@@ -179,6 +179,8 @@
   const COLOR_JERSEY = '#1a1714';
   const COLOR_BALL = '#5c3b22';
   const COLOR_NAVY = '#1c2b4a';
+  const COLOR_GOLD = '#d4af37';
+  const COLOR_OLIVE = '#5a6b3a';
 
   const PLAYER_COLORS = {
     helmet: COLOR_HELMET, stripe: COLOR_HELMET_STRIPE, skin: COLOR_SKIN,
@@ -245,6 +247,14 @@
       body: { html: '<p>Advanced data structures and technical interview practice alongside a full-stack web development track.</p>' },
     },
     {
+      id: 'midfield-cs', category: 'experience',
+      x: ydx(50), y: FIELD_Y + FIELD_H / 2,
+      yard: '50', plate: 'CS',
+      title: 'Computer Science Program',
+      meta: 'University of Maryland · Coursework',
+      body: { tags: ['Data Structures', 'Algorithms', 'Systems Programming', 'Databases', 'Software Engineering', 'Web Development'] },
+    },
+    {
       id: 'proj-lectureloop', category: 'project',
       x: ydx(50), y: FIELD_Y + FIELD_H * 0.34,
       yard: '50', plate: 'PROJ',
@@ -296,6 +306,48 @@
     entry.knock = 0;
     entry._knockedDown = false;
   });
+
+  // Testudo logo, baked at midfield. Each character in the bitmap maps to a
+  // color; '.' is skipped so the grass shows through. Cell size is a
+  // multiple of PXS so it renders crisp after the buffer is scaled up.
+  const LOGO_CELL = PXS * 2;
+  const LOGO_COLORS = {
+    K: COLOR_JERSEY, // dark outline
+    R: COLOR_ENDZONE, // red shell
+    G: COLOR_GOLD, // gold diamond
+    O: COLOR_OLIVE, // olive head/legs/tail
+    C: COLOR_LINE, // cream eyes
+  };
+  const LOGO_BITMAP = [
+    '.....OOO.....',
+    '....OCOCO....',
+    '.....OOO.....',
+    '...KKKKKKK...',
+    '..KKRRRRRKK..',
+    '.OKRRRRRRRKO.',
+    'OKRRGGGGGRRKO',
+    'OKRRGGGGGRRKO',
+    'OKRRGGGGGRRKO',
+    '.OKRRRRRRRKO.',
+    '..KKRRRRRKK..',
+    '...KKKKKKK...',
+    '......O......',
+  ];
+
+  function drawLogo(c, cx, cy) {
+    const rows = LOGO_BITMAP.length;
+    const cols = LOGO_BITMAP[0].length;
+    const originX = cx - (cols * LOGO_CELL) / 2;
+    const originY = cy - (rows * LOGO_CELL) / 2;
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        const color = LOGO_COLORS[LOGO_BITMAP[row][col]];
+        if (!color) continue;
+        c.fillStyle = color;
+        c.fillRect(originX + col * LOGO_CELL, originY + row * LOGO_CELL, LOGO_CELL, LOGO_CELL);
+      }
+    }
+  }
 
   function drawField(c) {
     // Mowing stripes.
@@ -423,6 +475,9 @@
 
     // Field, baked on top.
     drawField(worldCtx);
+
+    // Testudo logo at the exact center of the field.
+    drawLogo(worldCtx, ydx(50), FIELD_Y + FIELD_H / 2);
 
     // Banners on the inner railings.
     drawBanners();
